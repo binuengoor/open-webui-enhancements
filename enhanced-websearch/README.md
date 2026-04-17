@@ -64,6 +64,11 @@ Pipe script valves (10):
 
 Everything else uses internal defaults tuned for typical self-hosted setups.
 
+Important key-format note:
+
+- Vane model keys must match `/api/config` exactly.
+- Example: use `Xenova/nomic-embed-text-v1` (not `nomic-embed-text-v1`) when using the Transformers embedding provider.
+
 ### 2) User Valves (per-user behavior)
 
 Configured by the user in chat/tool settings (when exposed by Open-WebUI).
@@ -71,7 +76,7 @@ Configured by the user in chat/tool settings (when exposed by Open-WebUI).
 - mode
 - show_status_updates
 - include_citations
-- show_reasoning
+- show_reasoning (default: false)
 - max_iterations
 
 ### 3) Runtime Function Arguments (model/tool call level)
@@ -147,5 +152,8 @@ Mandatory for pipe version only if you want forced planning model override:
 - The tool script uses heuristic research planning by default.
 - Advanced tuning knobs (timeouts, RRF, language, time range, token limits) are intentionally internal defaults in v1.1 to keep the valve surface small.
 - The pipe script uses Open-WebUI model calls for research planning and synthesis.
+- The pipe returns concise markdown output (deep summary + top sources) instead of raw JSON.
+- In deep mode, fast evidence and Vane output are fused into consensus points plus fast-only and Vane-only additions.
+- Enable `show_reasoning` only when debugging, to keep responses clean.
 - The tool version is best for attaching to a model as a callable search tool.
 - The pipe version is best for model-driven research workflows and synthesis.

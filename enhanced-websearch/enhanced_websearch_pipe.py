@@ -238,7 +238,7 @@ class Pipe:
         VANE_CHAT_MODEL_PROVIDER_ID: str = Field(default="", description="Vane chat provider ID")
         VANE_CHAT_MODEL_KEY: str = Field(default="auto-main", description="Vane chat model key")
         VANE_EMBEDDING_MODEL_PROVIDER_ID: str = Field(default="", description="Vane embedding provider ID")
-        VANE_EMBEDDING_MODEL_KEY: str = Field(default="openrouter/perplexity/pplx-embed-v1-0.6b", description="Vane embedding model key")
+        VANE_EMBEDDING_MODEL_KEY: str = Field(default="Xenova/nomic-embed-text-v1", description="Vane embedding model key")
         RESEARCH_MODEL: str = Field(default="", description="Optional Open-WebUI model key for research planning; leave empty to use active chat model")
 
         INTERNAL_DEFAULTS: ClassVar[Dict[str, Any]] = {
@@ -275,7 +275,7 @@ class Pipe:
         mode: str = Field(default="auto", description="auto, fast, deep, research")
         show_status_updates: bool = Field(default=True)
         include_citations: bool = Field(default=True)
-        show_reasoning: bool = Field(default=True)
+        show_reasoning: bool = Field(default=False)
         max_iterations: int = Field(default=5, ge=1, le=10, description="Max research cycles in research mode")
 
     def __init__(self):
@@ -598,6 +598,193 @@ class Pipe:
             chunks.append(f"=== SOURCE: {page.get('title', 'Untitled')} ({page.get('url', '')}) ===\n{page.get('content', '')[:2000]}")
         return "\n\n".join(chunks)
 
+    def _sentence_fragments(self, text: str) -> List[str]:
+        if not text:
+            return []
+        parts = re.split(r"(?<=[.!?])\s+", " ".join(text.split()))
+        return [p.strip() for p in parts if len(p.strip()) >= 30]
+
+    def _fast_bullets(self, pages: List[Dict[str, Any]], limit: int = 8) -> List[str]:
+        bullets: List[str] = []
+        seen = set()
+        for page in pages[:limit]:
+            title = (page.get("title") or "Untitled").strip()
+            raw = page.get("snippet") or page.get("content") or ""
+            fragments = self._sentence_fragments(raw)
+            if not fragments:
+                continue
+            bullet = f"{title}: {fragments[0]}"
+            key = bullet.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            bullets.append(bullet)
+        return bullets
+
+    def _vane_bullets(self, deep_synthesis: Optional[Dict[str, Any]], limit: int = 8) -> List[str]:
+        if not deep_synthesis:
+            return []
+        message = deep_synthesis.get("message", "") or ""
+        if not message:
+            return []
+        lines: List[str] = []
+        for chunk in message.splitlines():
+            line = chunk.strip()
+            if not line:
+                continue
+            line = re.sub(r"^[-*#\d.\)\s]+", "", line).strip()
+            if len(line) >= 30:
+                lines.append(line)
+        if not lines:
+            lines = self._sentence_fragments(message)
+        deduped: List[str] = []
+        seen = set()
+        for line in lines:
+            key = line.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(line)
+        return deduped[:limit]
+
+    def _term_overlap(self, left: str, right: str) -> float:
+        a = self._term_signature(left)
+        b = self._term_signature(right)
+        union = a | b
+        if not union:
+            return 0.0
+        return len(a & b) / len(union)
+
+    def _fuse_deep_signals(
+        self,
+        fast_pages: List[Dict[str, Any]],
+        deep_synthesis: Optional[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        if not deep_synthesis or deep_synthesis.get("error"):
+            return {
+                "enabled": False,
+                "reason": "deep_synthesis_unavailable",
+                "consensus": [],
+                "fast_additions": [],
+                "vane_additions": [],
+            }
+
+        fast = self._fast_bullets(fast_pages)
+        vane = self._vane_bullets(deep_synthesis)
+        consensus = []
+        vane_only = []
+        matched_fast = set()
+
+        for vb in vane:
+            best_idx = -1
+            best_score = 0.0
+            for idx, fb in enumerate(fast):
+                score = self._term_overlap(vb, fb)
+                if score > best_score:
+                    best_score = score
+                    best_idx = idx
+            if best_idx >= 0 and best_score >= 0.22:
+                matched_fast.add(best_idx)
+                consensus.append(
+                    {
+                        "vane": vb,
+                        "fast": fast[best_idx],
+                        "overlap": round(best_score, 3),
+                    }
+                )
+            else:
+                vane_only.append(vb)
+
+        fast_only = [fb for idx, fb in enumerate(fast) if idx not in matched_fast]
+        return {
+            "enabled": True,
+            "reason": "ok",
+            "consensus": consensus[:5],
+            "fast_additions": fast_only[:5],
+            "vane_additions": vane_only[:5],
+        }
+
+    def _clip(self, text: str, limit: int = 240) -> str:
+        if not text:
+            return ""
+        normalized = " ".join(text.split())
+        if len(normalized) <= limit:
+            return normalized
+        return normalized[: limit - 3] + "..."
+
+    def _render_sources(self, pages: List[Dict[str, Any]], limit: int = 6) -> str:
+        lines = []
+        for page in pages[:limit]:
+            title = self._clip(page.get("title", "Untitled"), 120)
+            url = page.get("url", "")
+            snippet = self._clip(page.get("snippet", "") or page.get("content", ""), 220)
+            if url:
+                lines.append(f"- [{title}]({url})")
+            else:
+                lines.append(f"- {title}")
+            if snippet:
+                lines.append(f"  {snippet}")
+        return "\n".join(lines) if lines else "- No sources found."
+
+    def _render_reasoning(self, reasoning: Dict[str, Any]) -> str:
+        return "\n".join(
+            [
+                "### Reasoning",
+                f"- Mode requested: {reasoning.get('mode_requested')}",
+                f"- Mode selected: {reasoning.get('mode_selected')}",
+                f"- Query variants: {len(reasoning.get('query_variants', []))}",
+                f"- Avg source quality: {reasoning.get('avg_quality')}",
+                f"- Coverage (usable pages): {reasoning.get('coverage')}",
+                f"- Search failures: {len(reasoning.get('search_failures', []))}",
+            ]
+        )
+
+    def _render_final_response(
+        self,
+        query: str,
+        mode: str,
+        pages: List[Dict[str, Any]],
+        reasoning: Dict[str, Any],
+        deep_synthesis: Optional[Dict[str, Any]],
+        deep_fusion: Optional[Dict[str, Any]],
+        show_reasoning: bool,
+    ) -> str:
+        lines = [f"### Enhanced Websearch ({mode})", f"Query: {query}"]
+
+        if deep_synthesis and deep_synthesis.get("message"):
+            lines.append("\n### Deep Synthesis")
+            lines.append(self._clip(deep_synthesis.get("message", ""), 1800))
+        elif deep_synthesis and deep_synthesis.get("error"):
+            lines.append("\n### Deep Synthesis")
+            lines.append("Vane deep synthesis failed; returning best fast-search evidence.")
+            lines.append(self._clip(str(deep_synthesis.get("error")), 240))
+
+        if deep_fusion and deep_fusion.get("enabled"):
+            lines.append("\n### Deep Fusion")
+            consensus = deep_fusion.get("consensus", [])
+            fast_additions = deep_fusion.get("fast_additions", [])
+            vane_additions = deep_fusion.get("vane_additions", [])
+            if consensus:
+                lines.append("- Consensus points:")
+                for row in consensus[:4]:
+                    lines.append(f"  - {self._clip(row.get('vane', ''), 180)}")
+            if fast_additions:
+                lines.append("- Additional fast-evidence points:")
+                for item in fast_additions[:3]:
+                    lines.append(f"  - {self._clip(item, 180)}")
+            if vane_additions:
+                lines.append("- Additional Vane points:")
+                for item in vane_additions[:3]:
+                    lines.append(f"  - {self._clip(item, 180)}")
+
+        lines.append("\n### Top Sources")
+        lines.append(self._render_sources(pages, limit=8))
+
+        if show_reasoning:
+            lines.append("\n" + self._render_reasoning(reasoning))
+
+        return "\n".join(lines)
+
     async def _search_and_scrape(self, query: str, emitter: EventEmitter) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[str], List[str]]:
         variants = self._expand_queries(query)
         result_sets: List[List[Dict[str, Any]]] = []
@@ -728,11 +915,17 @@ class Pipe:
             }
 
             output["reasoning"]["mode_prefix_override"] = mode_prefix_override
-            if show_reasoning:
-                await emitter.message("\n".join(["### Unified Search Function v1.1 Reasoning", f"- Mode requested: {requested_mode}", f"- Queries used: {len(queries_used)}", f"- Sources gathered: {len(all_pages)}"]))
             if show_status:
                 await emitter.status(f"Complete: mode=research, sources={len(all_pages)}, cycles={cycle}", status="complete", done=True)
-            return ""
+            return self._render_final_response(
+                query=user_query,
+                mode="research",
+                pages=all_pages,
+                reasoning=output["reasoning"],
+                deep_synthesis=None,
+                deep_fusion=None,
+                show_reasoning=show_reasoning,
+            )
 
         fused, scraped, failures, variants = await self._search_and_scrape(enriched_query, emitter)
         avg_quality = sum(item.get("quality_score", 0.0) for item in scraped) / len(scraped) if scraped else 0.0
@@ -742,17 +935,16 @@ class Pipe:
             selected_mode = "deep" if (self._is_complex_query(user_query) or avg_quality < 0.28 or coverage < max(2, self.valves.PAGES_TO_SCRAPE // 2)) else "fast"
 
         deep_synthesis = None
+        deep_fusion = None
         if selected_mode == "deep":
             mode_used, deep_synthesis = await self._vane_or_fast(enriched_query, "web", "balanced", emitter)
             selected_mode = mode_used
+            deep_fusion = self._fuse_deep_signals(scraped, deep_synthesis)
 
         if include_citations:
             for item in scraped[:8]:
                 if item.get("url") and item.get("content"):
                     await emitter.citation(item.get("title", "Untitled"), item["url"], item["content"])
-
-        if show_reasoning:
-            await emitter.message("\n".join(["### Unified Search Function v1.1 Reasoning", f"- Mode requested: {requested_mode}", f"- Mode selected: {selected_mode}", f"- Query variants: {len(variants)}", f"- Avg source quality: {round(avg_quality, 3)}", f"- Coverage (usable pages): {coverage}"]))
 
         output = {
             "query": user_query,
@@ -761,6 +953,7 @@ class Pipe:
             "results_scraped": scraped,
             "results_ranked": fused,
             "deep_synthesis": deep_synthesis,
+            "deep_fusion": deep_fusion,
             "reasoning": {"mode_requested": requested_mode, "mode_selected": selected_mode, "is_complex_query": self._is_complex_query(user_query), "is_temporal_query": self._is_temporal_query(user_query), "query_variants": variants, "avg_quality": round(avg_quality, 3), "coverage": coverage, "search_failures": failures, "datetime_context": dt_info},
             "notes": {"fusion": "Reciprocal Rank Fusion used across query variants", "fallback": "Deep mode falls back to fast evidence if Vane fails", "research": "Research mode uses Open-WebUI model calls for follow-up query generation and continue/stop decisions"},
         }
@@ -769,4 +962,12 @@ class Pipe:
 
         if show_status:
             await emitter.status(f"Complete: mode={selected_mode}, fused={len(fused)}, scraped={len(scraped)}", status="complete", done=True)
-        return json.dumps(output, ensure_ascii=False)
+        return self._render_final_response(
+            query=user_query,
+            mode=selected_mode,
+            pages=scraped,
+            reasoning=output["reasoning"],
+            deep_synthesis=deep_synthesis,
+            deep_fusion=deep_fusion,
+            show_reasoning=show_reasoning,
+        )

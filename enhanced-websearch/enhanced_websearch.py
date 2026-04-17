@@ -387,7 +387,7 @@ class Tools:
         VANE_CHAT_MODEL_PROVIDER_ID: str = Field(default="", description="Vane chat provider ID")
         VANE_CHAT_MODEL_KEY: str = Field(default="auto-main", description="Vane chat model key")
         VANE_EMBEDDING_MODEL_PROVIDER_ID: str = Field(default="", description="Vane embedding provider ID")
-        VANE_EMBEDDING_MODEL_KEY: str = Field(default="openrouter/perplexity/pplx-embed-v1-0.6b", description="Vane embedding model key")
+        VANE_EMBEDDING_MODEL_KEY: str = Field(default="Xenova/nomic-embed-text-v1", description="Vane embedding model key")
 
         INTERNAL_DEFAULTS: ClassVar[Dict[str, Any]] = {
             "REQUEST_TIMEOUT": 15,
@@ -811,6 +811,113 @@ class Tools:
             )
         return "\n\n".join(chunks)
 
+    def _sentence_fragments(self, text: str) -> List[str]:
+        if not text:
+            return []
+        parts = re.split(r"(?<=[.!?])\s+", " ".join(text.split()))
+        return [p.strip() for p in parts if len(p.strip()) >= 30]
+
+    def _fast_bullets(self, pages: List[Dict[str, Any]], limit: int = 8) -> List[str]:
+        bullets: List[str] = []
+        seen = set()
+        for page in pages[:limit]:
+            title = (page.get("title") or "Untitled").strip()
+            raw = page.get("snippet") or page.get("content") or ""
+            fragments = self._sentence_fragments(raw)
+            if not fragments:
+                continue
+            bullet = f"{title}: {fragments[0]}"
+            key = bullet.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            bullets.append(bullet)
+        return bullets
+
+    def _vane_bullets(self, deep_synthesis: Optional[Dict[str, Any]], limit: int = 8) -> List[str]:
+        if not deep_synthesis:
+            return []
+        message = deep_synthesis.get("message", "") or ""
+        if not message:
+            return []
+        lines: List[str] = []
+        for chunk in message.splitlines():
+            line = chunk.strip()
+            if not line:
+                continue
+            line = re.sub(r"^[-*#\d.\)\s]+", "", line).strip()
+            if len(line) >= 30:
+                lines.append(line)
+        if not lines:
+            lines = self._sentence_fragments(message)
+        deduped: List[str] = []
+        seen = set()
+        for line in lines:
+            key = line.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(line)
+        return deduped[:limit]
+
+    def _term_overlap(self, left: str, right: str) -> float:
+        a = self._term_signature(left)
+        b = self._term_signature(right)
+        union = a | b
+        if not union:
+            return 0.0
+        return len(a & b) / len(union)
+
+    def _fuse_deep_signals(
+        self,
+        fast_pages: List[Dict[str, Any]],
+        deep_synthesis: Optional[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        if not deep_synthesis or deep_synthesis.get("error"):
+            return {
+                "enabled": False,
+                "reason": "deep_synthesis_unavailable",
+                "consensus": [],
+                "fast_additions": [],
+                "vane_additions": [],
+            }
+
+        fast = self._fast_bullets(fast_pages)
+        vane = self._vane_bullets(deep_synthesis)
+        consensus = []
+        vane_only = []
+        matched_fast = set()
+
+        for vb in vane:
+            best_idx = -1
+            best_score = 0.0
+            for idx, fb in enumerate(fast):
+                score = self._term_overlap(vb, fb)
+                if score > best_score:
+                    best_score = score
+                    best_idx = idx
+            if best_idx >= 0 and best_score >= 0.22:
+                matched_fast.add(best_idx)
+                consensus.append(
+                    {
+                        "vane": vb,
+                        "fast": fast[best_idx],
+                        "overlap": round(best_score, 3),
+                    }
+                )
+            else:
+                vane_only.append(vb)
+
+        fast_only = [fb for idx, fb in enumerate(fast) if idx not in matched_fast]
+
+        return {
+            "enabled": True,
+            "reason": "ok",
+            "consensus": consensus[:5],
+            "fast_additions": fast_only[:5],
+            "vane_additions": vane_only[:5],
+        }
+
     def _heuristic_followup_query(self, original_query: str, pages: List[Dict[str, Any]]) -> str:
         if not pages:
             return f"{original_query} latest developments"
@@ -1108,10 +1215,12 @@ class Tools:
         complex_query = self._is_complex_query(query)
 
         deep_synthesis = None
+        deep_fusion = None
         if selected_mode == "deep":
             if show_status:
                 await emitter.status("Escalating to deep synthesis via Vane")
             deep_synthesis = await self._vane_deep_search(enriched_query, source_mode, depth)
+            deep_fusion = self._fuse_deep_signals(scraped, deep_synthesis)
 
             # Best-of-both behavior: if deep fails, keep fast evidence as fallback.
             if deep_synthesis and deep_synthesis.get("error"):
@@ -1165,6 +1274,7 @@ class Tools:
             "results_scraped": scraped,
             "results_ranked": fused,
             "deep_synthesis": deep_synthesis,
+            "deep_fusion": deep_fusion,
             "reasoning": reasoning,
             "notes": {
                 "fusion": "Reciprocal Rank Fusion used across query variants",
