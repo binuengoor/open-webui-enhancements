@@ -34,48 +34,35 @@ Open-WebUI exposes three configuration surfaces for these scripts.
 
 Configured from Open-WebUI Admin Panel -> Tools -> this tool -> gear icon.
 
+This module now exposes a curated valve surface: maximum 10 valves per script.
+
+Tool script valves (10):
+
 - SEARXNG_BASE_URL
 - VANE_URL
 - FLARESOLVERR_URL
-- REQUEST_TIMEOUT
-- FLARESOLVERR_TIMEOUT
-- USER_AGENT
 - SEARCH_RESULTS_PER_QUERY
-- QUERY_VARIANTS_LIMIT
 - PAGES_TO_SCRAPE
 - CONCURRENT_SCRAPE_WORKERS
-- RRF_K
-- SEARCH_CATEGORIES
-- SEARCH_ENGINES
-- SEARCH_LANGUAGE
-- SEARCH_TIME_RANGE
-- MAX_PAGE_CONTENT_CHARS
-- MIN_CONTENT_CHARS
-- INJECT_DATETIME
-- DATETIME_FORMAT
-- TIMEZONE
 - ENABLE_VANE_DEEP
 - VANE_CHAT_MODEL_PROVIDER_ID
-- VANE_CHAT_MODEL_KEY
 - VANE_EMBEDDING_MODEL_PROVIDER_ID
-- VANE_EMBEDDING_MODEL_KEY
-- VANE_TIMEOUT
-- RESEARCH_MIN_ITERATIONS
-- RESEARCH_MAX_CONTEXT_SOURCES
-- IGNORED_DOMAINS
+- RESEARCH_BACKEND (heuristic or ollama)
 
-Tool-only admin valves:
+Pipe script valves (10):
 
-- RESEARCH_BACKEND (default: heuristic)
-- OLLAMA_URL
-- OLLAMA_MODEL
-- OLLAMA_TIMEOUT
-
-Pipe-only admin valves:
-
+- SEARXNG_BASE_URL
+- VANE_URL
+- FLARESOLVERR_URL
+- SEARCH_RESULTS_PER_QUERY
+- PAGES_TO_SCRAPE
+- CONCURRENT_SCRAPE_WORKERS
+- ENABLE_VANE_DEEP
+- VANE_CHAT_MODEL_PROVIDER_ID
+- VANE_EMBEDDING_MODEL_PROVIDER_ID
 - RESEARCH_MODEL
-- RESEARCH_MODEL_TEMPERATURE
-- RESEARCH_MODEL_MAX_TOKENS
+
+Everything else uses internal defaults tuned for typical self-hosted setups.
 
 ### 2) User Valves (per-user behavior)
 
@@ -128,11 +115,8 @@ If you are using Vane and SearXNG as upstream services:
 - depth: balanced
 - max_iterations: 5
 - SEARCH_RESULTS_PER_QUERY: 8
-- QUERY_VARIANTS_LIMIT: 4
 - PAGES_TO_SCRAPE: 5
 - CONCURRENT_SCRAPE_WORKERS: 4
-- RRF_K: 60
-- INJECT_DATETIME: true
 - ENABLE_VANE_DEEP: true
 - RESEARCH_MODEL: your Open-WebUI configured model key
 
@@ -150,8 +134,8 @@ Mandatory if deep mode is enabled (selected or auto-escalated):
 
 Mandatory for tool version only when RESEARCH_BACKEND=ollama:
 
-- OLLAMA_URL must be reachable.
-- OLLAMA_MODEL must exist in that Ollama instance.
+- Internal defaults target OLLAMA_URL=http://localhost:11434/api/generate and OLLAMA_MODEL=llama3.2.
+- If your Ollama endpoint/model differs, keep RESEARCH_BACKEND=heuristic or edit script internals.
 
 Mandatory for pipe version only if you want forced planning model override:
 
@@ -163,6 +147,7 @@ Mandatory for pipe version only if you want forced planning model override:
 - Both scripts are import-ready as standalone Open-WebUI extensions.
 - Deep mode requires Vane model provider IDs to be configured.
 - The tool script uses heuristic research planning by default. Set RESEARCH_BACKEND=ollama to enable Ollama-assisted planning.
+- Advanced tuning knobs (timeouts, RRF, language, time range, token limits) are intentionally internal defaults in v1.1 to keep the valve surface small.
 - The pipe script uses Open-WebUI model calls for research planning and synthesis.
 - The tool version is best for attaching to a model as a callable search tool.
 - The pipe version is best for model-driven research workflows and synthesis.

@@ -18,7 +18,7 @@ import logging
 import re
 from datetime import datetime, timedelta
 from io import BytesIO
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, ClassVar, Dict, List, Optional, Tuple
 from urllib.parse import parse_qs, urlencode, urljoin, urlparse, urlunparse
 
 import requests
@@ -375,101 +375,50 @@ class PageScraper:
 
 class Tools:
     class Valves(BaseModel):
-        SEARXNG_BASE_URL: str = Field(
-            default="http://searxng:8080", description="SearXNG base URL"
-        )
+        SEARXNG_BASE_URL: str = Field(default="http://searxng:8080", description="SearXNG base URL")
         VANE_URL: str = Field(default="http://vane:3000", description="Vane base URL")
         FLARESOLVERR_URL: str = Field(
             default="http://flaresolverr:8191/v1",
             description="FlareSolverr endpoint; set empty to disable",
         )
-
-        REQUEST_TIMEOUT: int = Field(default=15, description="HTTP timeout in seconds")
-        FLARESOLVERR_TIMEOUT: int = Field(
-            default=60, description="FlareSolverr timeout in seconds"
-        )
-        USER_AGENT: str = Field(
-            default="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            description="User-Agent for scraping",
-        )
-
         SEARCH_RESULTS_PER_QUERY: int = Field(default=8, ge=3, le=20)
-        QUERY_VARIANTS_LIMIT: int = Field(default=4, ge=1, le=8)
         PAGES_TO_SCRAPE: int = Field(default=5, ge=1, le=12)
         CONCURRENT_SCRAPE_WORKERS: int = Field(default=4, ge=1, le=12)
-        RRF_K: int = Field(default=60, ge=1, le=200)
+        ENABLE_VANE_DEEP: bool = Field(default=True, description="Allow deep synthesis via Vane")
+        VANE_CHAT_MODEL_PROVIDER_ID: str = Field(default="", description="Vane chat provider ID")
+        VANE_EMBEDDING_MODEL_PROVIDER_ID: str = Field(default="", description="Vane embedding provider ID")
+        RESEARCH_BACKEND: str = Field(default="heuristic", description="Follow-up query backend: ollama or heuristic")
 
-        SEARCH_CATEGORIES: str = Field(
-            default="general", description="Comma-separated SearXNG categories"
-        )
-        SEARCH_ENGINES: str = Field(
-            default="", description="Optional comma-separated engines"
-        )
-        SEARCH_LANGUAGE: str = Field(default="en", description="SearXNG language code")
-        SEARCH_TIME_RANGE: str = Field(
-            default="", description="Optional: day, week, month, year"
-        )
+        INTERNAL_DEFAULTS: ClassVar[Dict[str, Any]] = {
+            "REQUEST_TIMEOUT": 15,
+            "FLARESOLVERR_TIMEOUT": 60,
+            "USER_AGENT": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "QUERY_VARIANTS_LIMIT": 4,
+            "RRF_K": 60,
+            "SEARCH_CATEGORIES": "general",
+            "SEARCH_ENGINES": "",
+            "SEARCH_LANGUAGE": "en",
+            "SEARCH_TIME_RANGE": "",
+            "MAX_PAGE_CONTENT_CHARS": 25000,
+            "MIN_CONTENT_CHARS": 80,
+            "INJECT_DATETIME": True,
+            "DATETIME_FORMAT": "%Y-%m-%d %A %B %d",
+            "TIMEZONE": "UTC",
+            "VANE_CHAT_MODEL_KEY": "auto-main",
+            "VANE_EMBEDDING_MODEL_KEY": "openrouter/perplexity/pplx-embed-v1-0.6b",
+            "VANE_TIMEOUT": 45,
+            "OLLAMA_URL": "http://localhost:11434/api/generate",
+            "OLLAMA_MODEL": "llama3.2",
+            "OLLAMA_TIMEOUT": 20,
+            "RESEARCH_MIN_ITERATIONS": 2,
+            "RESEARCH_MAX_CONTEXT_SOURCES": 20,
+            "IGNORED_DOMAINS": "",
+        }
 
-        MAX_PAGE_CONTENT_CHARS: int = Field(default=25000, ge=2000, le=200000)
-        MIN_CONTENT_CHARS: int = Field(default=80, ge=20, le=2000)
-
-        INJECT_DATETIME: bool = Field(
-            default=True, description="Inject temporal context for date-sensitive queries"
-        )
-        DATETIME_FORMAT: str = Field(
-            default="%Y-%m-%d %A %B %d",
-            description="Date format used in temporal enrichment",
-        )
-        TIMEZONE: str = Field(default="UTC", description="Timezone for temporal context")
-
-        ENABLE_VANE_DEEP: bool = Field(
-            default=True, description="Allow deep synthesis via Vane"
-        )
-        VANE_CHAT_MODEL_PROVIDER_ID: str = Field(
-            default="", description="Vane chat provider ID"
-        )
-        VANE_CHAT_MODEL_KEY: str = Field(
-            default="auto-main", description="Vane chat model key"
-        )
-        VANE_EMBEDDING_MODEL_PROVIDER_ID: str = Field(
-            default="", description="Vane embedding provider ID"
-        )
-        VANE_EMBEDDING_MODEL_KEY: str = Field(
-            default="openrouter/perplexity/pplx-embed-v1-0.6b",
-            description="Vane embedding model key",
-        )
-        VANE_TIMEOUT: int = Field(default=45, ge=10, le=180)
-
-        RESEARCH_BACKEND: str = Field(
-            default="heuristic",
-            description="Follow-up query backend: ollama or heuristic",
-        )
-        OLLAMA_URL: str = Field(
-            default="http://localhost:11434/api/generate",
-            description="Ollama generate endpoint",
-        )
-        OLLAMA_MODEL: str = Field(
-            default="llama3.2", description="Ollama model for research loop helpers"
-        )
-        OLLAMA_TIMEOUT: int = Field(
-            default=20, ge=5, le=120, description="Ollama request timeout seconds"
-        )
-        RESEARCH_MIN_ITERATIONS: int = Field(
-            default=2,
-            ge=1,
-            le=10,
-            description="Minimum cycles before stop checks in research mode",
-        )
-        RESEARCH_MAX_CONTEXT_SOURCES: int = Field(
-            default=20,
-            ge=5,
-            le=60,
-            description="Max gathered sources included in returned research context",
-        )
-
-        IGNORED_DOMAINS: str = Field(
-            default="", description="Comma-separated domains to skip"
-        )
+        def __getattr__(self, name: str) -> Any:
+            if name in self.INTERNAL_DEFAULTS:
+                return self.INTERNAL_DEFAULTS[name]
+            raise AttributeError(name)
 
     class UserValves(BaseModel):
         mode: str = Field(
