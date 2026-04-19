@@ -1,89 +1,82 @@
-# Enhanced Websearch v1.1
+# Enhanced Websearch (Tool-Only)
 
-This folder contains two Open-WebUI-ready variants:
+This module now provides a single Open-WebUI surface:
 
-Two variants live here:
+- [enhanced_websearch.py](enhanced_websearch.py): single deployable Open-WebUI tool artifact
 
-- [enhanced_websearch.py](enhanced_websearch.py): tool version for direct retrieval
-- [enhanced_websearch_pipe.py](enhanced_websearch_pipe.py): function/pipe version for model-driven research
+The previous pipe/function implementation has been removed as part of the tool-first refactor.
 
-## Which One To Use
+## Architecture
 
-- Use the tool version when you want fast search, fetch, extract, and citations with minimal orchestration.
-- Use the pipe version when you want the model to drive iterative research, follow-up queries, and final synthesis.
-- If you want Perplexity-like behavior, the pipe version is the better fit.
+`enhanced_websearch.py` contains one canonical internal execution path (`_run_research`) and thin public entrypoints:
 
-## Shared Capabilities
+- `elevated_search`: primary structured research tool
+- `fetch_page`: direct fetch helper
+- `extract_page_structure`: structural extraction helper
+
+Capabilities:
 
 - SearXNG retrieval
-- Query expansion
-- Reciprocal Rank Fusion (RRF)
-- Concurrent page scraping
+- Query expansion + Reciprocal Rank Fusion (RRF)
+- Concurrent scraping
 - FlareSolverr fallback for blocked pages
-- Optional Vane deep synthesis
-- Temporal query enrichment
-- Structured page extraction
+- Optional Vane deep synthesis with fast fallback behavior
+- Iterative research mode with explicit stop conditions
 
-## Files
+## Runtime Support Matrix
+
+Standard Python or server runtimes:
+
+- Fully supported path
+- Transport backend: `requests`
+- HTML parser backend: `beautifulsoup4`
+- Scrape execution: threadpool
+- PDF extraction: `pypdf` or `PyPDF2` when available
+
+Strict constrained runtimes (Pyodide-style browser constraints):
+
+- Degraded but supported path
+- Transport fallback: stdlib `urllib`
+- HTML parsing fallback: basic text extraction (no full DOM fidelity)
+- Scrape execution fallback: sequential (no threadpool)
+- PDF extraction may be unavailable
+
+Unsupported capability handling:
+
+- The tool returns partial results when possible.
+- Runtime limitations are reported in `diagnostics.runtime` and `diagnostics.warnings`.
 
 ## Open-WebUI Configurable Parameters
 
-Open-WebUI exposes three configuration surfaces for these scripts.
-
-### 1) Admin Tool Valves (global defaults)
+### 1) Admin Valves (global defaults)
 
 Configured from Open-WebUI Admin Panel -> Tools -> this tool -> gear icon.
 
-This module now exposes a curated valve surface: maximum 10 valves per script.
-
-Tool script valves (10):
-
-- SEARXNG_BASE_URL
-- VANE_URL
-- FLARESOLVERR_URL
-- SEARCH_RESULTS_PER_QUERY
-- PAGES_TO_SCRAPE
-- ENABLE_VANE_DEEP
-- VANE_CHAT_MODEL_PROVIDER_ID
-- VANE_CHAT_MODEL_KEY
-- VANE_EMBEDDING_MODEL_PROVIDER_ID
-- VANE_EMBEDDING_MODEL_KEY
-
-Pipe script valves (10):
-
-- SEARXNG_BASE_URL
-- VANE_URL
-- FLARESOLVERR_URL
-- SEARCH_RESULTS_PER_QUERY
-- PAGES_TO_SCRAPE
-- VANE_CHAT_MODEL_PROVIDER_ID
-- VANE_CHAT_MODEL_KEY
-- VANE_EMBEDDING_MODEL_PROVIDER_ID
-- VANE_EMBEDDING_MODEL_KEY
-- RESEARCH_MODEL
-
-Everything else uses internal defaults tuned for typical self-hosted setups.
-
-Important key-format note:
-
-- Vane model keys must match `/api/config` exactly.
-- Example: use `Xenova/nomic-embed-text-v1` (not `nomic-embed-text-v1`) when using the Transformers embedding provider.
+- `SEARXNG_BASE_URL`
+- `VANE_URL`
+- `FLARESOLVERR_URL`
+- `SEARCH_RESULTS_PER_QUERY`
+- `PAGES_TO_SCRAPE`
+- `ENABLE_VANE_DEEP`
+- `VANE_CHAT_MODEL_PROVIDER_ID`
+- `VANE_CHAT_MODEL_KEY`
+- `VANE_EMBEDDING_MODEL_PROVIDER_ID`
+- `VANE_EMBEDDING_MODEL_KEY`
+- `STRICT_COMPAT_MODE`
 
 Environment variable defaults:
 
-- Both tool and pipe read valve defaults from container env vars at startup.
-- You can set these in the Open-WebUI container environment:
-	- `SEARXNG_URL` or `SEARXNG_BASE_URL`
-	- `VANE_URL`
-	- `FLARESOLVERR_URL`
-	- `SEARCH_RESULTS_PER_QUERY`
-	- `PAGES_TO_SCRAPE`
-	- `ENABLE_VANE_DEEP`
-	- `VANE_CHAT_MODEL_PROVIDER_ID`
-	- `VANE_CHAT_MODEL_KEY`
-	- `VANE_EMBEDDING_MODEL_PROVIDER_ID`
-	- `VANE_EMBEDDING_MODEL_KEY`
-	- `RESEARCH_MODEL` (pipe only)
+- `SEARXNG_URL` or `SEARXNG_BASE_URL`
+- `VANE_URL`
+- `FLARESOLVERR_URL`
+- `SEARCH_RESULTS_PER_QUERY`
+- `PAGES_TO_SCRAPE`
+- `ENABLE_VANE_DEEP`
+- `VANE_CHAT_MODEL_PROVIDER_ID`
+- `VANE_CHAT_MODEL_KEY`
+- `VANE_EMBEDDING_MODEL_PROVIDER_ID`
+- `VANE_EMBEDDING_MODEL_KEY`
+- `STRICT_COMPAT_MODE`
 
 Advanced env overrides (internal defaults):
 
@@ -92,94 +85,67 @@ Advanced env overrides (internal defaults):
 - `SEARCH_CATEGORIES`, `SEARCH_ENGINES`, `SEARCH_LANGUAGE`, `SEARCH_TIME_RANGE`
 - `MAX_PAGE_CONTENT_CHARS`, `MIN_CONTENT_CHARS`
 - `INJECT_DATETIME`, `DATETIME_FORMAT`, `TIMEZONE`
-- `RESEARCH_MODEL_TEMPERATURE`, `RESEARCH_MODEL_MAX_TOKENS`, `RESEARCH_MIN_ITERATIONS`, `RESEARCH_MAX_CONTEXT_SOURCES`
+- `RESEARCH_MIN_ITERATIONS`, `RESEARCH_MAX_CONTEXT_SOURCES`
 
 ### 2) User Valves (per-user behavior)
 
-Configured by the user in chat/tool settings (when exposed by Open-WebUI).
+- `mode`
+- `show_status_updates`
+- `include_citations`
+- `show_reasoning`
+- `max_iterations`
 
-- mode
-- show_status_updates
-- include_citations
-- show_reasoning (default: false)
-- max_iterations
+### 3) Runtime Arguments (tool call)
 
-### 3) Runtime Function Arguments (model/tool call level)
+For `elevated_search`:
 
-The model can set these while calling functions.
+- `query` (required)
+- `mode` (default: `auto`) values: `auto`, `fast`, `deep`, `research`
+- `source_mode` (default: `web`) values: `web`, `academia`, `social`, `all`
+- `depth` (default: `balanced`) values: `quick`, `speed`, `balanced`, `quality`
 
-For elevated_search:
-- query (required)
-- mode (default: auto) values: auto, fast, deep, research
-- source_mode (default: web) values: web, academia, social, all
-- depth (default: balanced) values: quick, speed, balanced, quality
+Optional mode prefixes in query:
 
-Query prefix overrides (both tool and pipe):
+- `fast: ...`
+- `deep: ...`
 
-- Prefix with fast: to force fast mode for that request.
-- Prefix with deep: to force deep mode for that request.
-- If no prefix is provided, mode remains auto by default (or user valve override if configured).
+For `fetch_page`:
 
-Examples:
+- `url` (required)
 
-- fast: summarize Kubernetes ingress controller options
-- deep: compare LiteLLM vs OpenRouter routing strategies
+For `extract_page_structure`:
 
-For the tool script, these are exposed as tool-call arguments.
+- `url` (required)
+- `components` (default: `all`)
 
-For the pipe script, Open-WebUI uses the same behavior through the chat flow and the active model context.
+## Response Contract
 
-For fetch_page:
-- url (required)
+`elevated_search` now returns a structured JSON object with stable top-level fields:
 
-For extract_page_structure:
-- url (required)
-- components (default: all) values: all or comma-separated list from headings, links, tables, sections, code_blocks, lists, meta
+- `query`
+- `mode`
+- `direct_answer`
+- `summary`
+- `findings`
+- `citations`
+- `sources`
+- `follow_up_queries`
+- `diagnostics`
+- `timings`
+- `confidence`
 
-## Suggested Starter Defaults
+Transition compatibility:
 
-If you are using Vane and SearXNG as upstream services:
+- Legacy payload fields are still available under `legacy` for migration.
+- New integrations should read top-level structured fields first.
 
-- mode: auto
-- source_mode: web
-- depth: balanced
-- max_iterations: 5
-- SEARCH_RESULTS_PER_QUERY: 8
-- PAGES_TO_SCRAPE: 5
-- CONCURRENT_SCRAPE_WORKERS: 4
-- ENABLE_VANE_DEEP: true
-- RESEARCH_MODEL: your Open-WebUI configured model key
+Runtime diagnostics:
 
-## Mandatory vs Optional Valves
-
-Mandatory for both tool and pipe:
-
-- SEARXNG_BASE_URL must point to a reachable SearXNG instance.
-
-Mandatory if deep mode is enabled (selected or auto-escalated):
-
-- VANE_URL must be reachable.
-- VANE_CHAT_MODEL_PROVIDER_ID must be set.
-- VANE_EMBEDDING_MODEL_PROVIDER_ID must be set.
-
-Tool-specific research backend requirements:
-None. Tool research planning is heuristic by default and does not require a separate model backend valve.
-
-Mandatory for pipe version only if you want forced planning model override:
-
-- RESEARCH_MODEL is optional. If empty, pipe planning uses the active Open-WebUI chat model by default.
+- `diagnostics.runtime` reports active runtime backends and degraded reasons.
+- `diagnostics.warnings` includes runtime degradation warnings when applicable.
 
 ## Notes
 
 - This script does not write to the Open-WebUI database.
-- Both scripts are import-ready as standalone Open-WebUI extensions.
-- Deep mode requires Vane model provider IDs to be configured.
-- The tool script uses heuristic research planning by default.
-- Advanced tuning knobs (timeouts, RRF, language, time range, token limits) are intentionally internal defaults in v1.1 to keep the valve surface small.
-- The pipe script uses Open-WebUI model calls for research planning and synthesis.
-- The pipe returns concise markdown output (deep summary + top sources) instead of raw JSON.
-- In deep mode, fast evidence and Vane output are fused into consensus points plus fast-only and Vane-only additions.
-- Deep mode uses a longer internal Vane timeout and one automatic retry on read-timeout before falling back.
-- Enable `show_reasoning` only when debugging, to keep responses clean.
-- The tool version is best for attaching to a model as a callable search tool.
-- The pipe version is best for model-driven research workflows and synthesis.
+- Deep mode requires Vane provider IDs to be configured.
+- If deep synthesis fails or is low confidence, the tool falls back to fast evidence.

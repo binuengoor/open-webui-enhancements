@@ -1,50 +1,45 @@
 # Open WebUI Enhancements
 
-A collection of custom Open-WebUI tools and pipes for enhanced retrieval, research, and workflow capabilities.
+Tool-first Open-WebUI enhancements for grounded web research.
 
 ## Repository Layout
 
 - enhanced-websearch/
-  - enhanced_websearch.py: Tool version (callable search tool)
-  - enhanced_websearch_pipe.py: Pipe/function version (model-driven workflow)
-  - README.md: Module-specific setup and valve documentation
+  - enhanced_websearch.py: Single deployable tool artifact with internal sectioning
+  - README.md: Tool-specific architecture, valves, and output schema
+
+## Current Architecture
+
+The repository now supports a single Open-WebUI surface: tools.
+
+- The pipe/function implementation was removed.
+- `enhanced_websearch.py` is the only supported execution path.
+- Core logic is driven by one canonical research pipeline (`_run_research`) with a thin Open-WebUI entrypoint (`elevated_search`).
 
 ## Current Module
 
 ### enhanced-websearch
 
-Enhanced web retrieval and research for Open-WebUI with:
+Structured web retrieval and research with:
 
-- Query expansion + Reciprocal Rank Fusion (RRF)
+- SearXNG search + query expansion + RRF
 - Concurrent scraping with FlareSolverr fallback
-- Optional Vane deep synthesis
-- Research mode with iterative follow-up planning
-- Mode overrides via query prefix: `fast:` and `deep:`
+- Optional Vane deep synthesis with fast fallback behavior
+- Execution modes: `auto`, `fast`, `deep`, `research`
+- Structured JSON response with citations and diagnostics
+- Runtime-aware compatibility layer with strict mode and degraded diagnostics
 
 See module docs: `enhanced-websearch/README.md`
 
 ## Usage in Open-WebUI
 
 1. Open Admin Panel in Open-WebUI.
-2. Import the script you need from `enhanced-websearch/`.
+2. Import `enhanced-websearch/enhanced_websearch.py`.
 3. Configure admin valves (SearXNG required; Vane optional unless deep mode is used).
 4. Optionally configure user valves for mode/status/citations.
-
-## Adding New Enhancements
-
-Create a new top-level folder per enhancement and include:
-
-- Tool and/or pipe script(s)
-- Module README with valves, defaults, and mandatory settings
-- Minimal usage examples
-
-Suggested naming:
-
-- Folder: `kebab-case`
-- Python files: `snake_case`
 
 ## Development Notes
 
 - Keep scripts standalone and import-ready for Open-WebUI.
-- Avoid committing generated artifacts (`__pycache__`, `.pyc`).
 - Prefer configurable valves over hardcoded endpoints.
+- Keep Open-WebUI glue thin; business logic belongs in internal helpers.
