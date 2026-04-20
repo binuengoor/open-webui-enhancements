@@ -68,7 +68,7 @@ providers:
 
   - name: firecrawl
     kind: litellm-search
-    enabled: false
+    enabled: true
     weight: 1
     timeout_s: 12
     base_url: ${LITELLM_SEARCH_BASE_URL}
@@ -77,7 +77,7 @@ providers:
 
   - name: linkup
     kind: litellm-search
-    enabled: false
+    enabled: true
     weight: 1
     timeout_s: 12
     base_url: ${LITELLM_SEARCH_BASE_URL}

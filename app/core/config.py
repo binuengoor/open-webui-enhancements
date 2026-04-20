@@ -102,8 +102,21 @@ def _env(name: str, default: str = "") -> str:
     return value if value is not None else default
 
 
-def _csv_set(value: str) -> set[str]:
-    return {item.strip().lower() for item in value.split(",") if item.strip()}
+def _env_bool_optional(name: str) -> bool | None:
+    raw = os.getenv(name)
+    if raw is None:
+        return None
+    value = raw.strip().lower()
+    if value in {"1", "true", "yes", "on"}:
+        return True
+    if value in {"0", "false", "no", "off"}:
+        return False
+    return None
+
+
+def _provider_env_flag_name(provider_name: str) -> str:
+    token = re.sub(r"[^A-Za-z0-9]+", "_", provider_name.strip().upper()).strip("_")
+    return f"EWS_PROVIDER_{token}_ENABLED"
 
 
 def _expand_env_placeholders(value):
@@ -175,14 +188,16 @@ def _apply_env_overrides(payload: dict) -> dict:
     ).lower() in {"1", "true", "yes", "on"}
 
     shared_litellm_key_env = "LITELLM_API_KEY"
-    allowed_litellm = _csv_set(_env("LITELLM_ENABLED_PROVIDERS", ""))
     providers = payload.get("providers") or []
     for provider in providers:
-        if provider.get("kind") != "litellm-search":
-            continue
-        provider["api_key_env"] = shared_litellm_key_env
-        if allowed_litellm:
-            provider["enabled"] = provider.get("name", "").strip().lower() in allowed_litellm
+        name = provider.get("name", "").strip()
+        explicit_enabled = _env_bool_optional(_provider_env_flag_name(name))
+
+        if provider.get("kind") == "litellm-search":
+            provider["api_key_env"] = shared_litellm_key_env
+
+        if explicit_enabled is not None:
+            provider["enabled"] = explicit_enabled
 
     return payload
 
