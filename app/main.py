@@ -135,7 +135,8 @@ async def lifespan(app: FastAPI):
     )
 
     logger.info("Enhanced websearch service started")
-    yield
+    async with mcp_app.router.lifespan_context(mcp_app):
+        yield
     logger.info("Enhanced websearch service stopping")
 
 
