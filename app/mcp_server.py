@@ -16,6 +16,13 @@ except ImportError as exc:  # pragma: no cover
 logger = logging.getLogger(__name__)
 
 
+def _csv_env(name: str) -> list[str]:
+    raw = os.getenv(name, "")
+    if not raw:
+        return []
+    return [item.strip() for item in raw.split(",") if item.strip()]
+
+
 @dataclass
 class MCPConfig:
     backend_url: str
@@ -65,6 +72,25 @@ mcp = FastMCP(
     lifespan=lifespan,
 )
 mcp.settings.streamable_http_path = "/"
+
+# FastMCP transport_security nested env parsing for list fields can be unreliable
+# across runtimes. Apply explicit env-driven overrides here for predictable behavior.
+_allowed_hosts = _csv_env("EWS_MCP_ALLOWED_HOSTS")
+_allowed_origins = _csv_env("EWS_MCP_ALLOWED_ORIGINS")
+_dns_rebinding = os.getenv("EWS_MCP_DNS_REBINDING_PROTECTION")
+
+if mcp.settings.transport_security is not None:
+    if _allowed_hosts:
+        mcp.settings.transport_security.allowed_hosts = _allowed_hosts
+    if _allowed_origins:
+        mcp.settings.transport_security.allowed_origins = _allowed_origins
+    if _dns_rebinding is not None:
+        mcp.settings.transport_security.enable_dns_rebinding_protection = _dns_rebinding.strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
 
 
 async def _backend_post(ctx: Context, path: str, payload: dict[str, Any]) -> dict[str, Any]:
