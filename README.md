@@ -226,8 +226,15 @@ In-memory cache for v1:
 LiteLLM gateway setup defaults:
 
 - use one shared key: LITELLM_API_KEY
-- choose active LiteLLM providers with comma-separated names:
-  LITELLM_ENABLED_PROVIDERS=brave-search,serper,exa,tavily
+- provider enablement is controlled by per-provider flags (applies to all providers)
+  - `EWS_PROVIDER_SEARXNG_ENABLED=true|false`
+  - `EWS_PROVIDER_BRAVE_SEARCH_ENABLED=true|false`
+  - `EWS_PROVIDER_SERPER_ENABLED=true|false`
+  - `EWS_PROVIDER_EXA_ENABLED=true|false`
+  - `EWS_PROVIDER_TAVILY_ENABLED=true|false`
+  - `EWS_PROVIDER_FIRECRAWL_ENABLED=true|false`
+  - `EWS_PROVIDER_LINKUP_ENABLED=true|false`
+- when a flag is unset, YAML `providers[].enabled` is used
 
 Optional LLM result compiler (Perplexity `/search` response refinement):
 
