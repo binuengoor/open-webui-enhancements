@@ -1,0 +1,14 @@
+services:
+  enhanced-websearch:
+    # build: .
+    image: ghcr.io/binuengoor/enhanced-websearch:latest
+    container_name: enhanced-websearch
+    env_file:
+      - .env
+    ports:
+      - "8091:8091"
+    volumes:
+      - ./config/config.yaml:/app/config/config.yaml:ro
+    restart: unless-stopped
+
+

@@ -1,45 +1,233 @@
-# Open WebUI Enhancements
+# Enhanced Websearch Service
 
-Tool-first Open-WebUI enhancements for grounded web research.
+Standalone research backend for Open WebUI Perplexity-style tooling.
 
-## Repository Layout
+## What this is
 
-- enhanced-websearch/
-  - enhanced_websearch.py: Single deployable tool artifact with internal sectioning
-  - README.md: Tool-specific architecture, valves, and output schema
+This service is the canonical research engine. It owns:
 
-## Current Architecture
+- query normalization and planning
+- mode semantics (auto, fast, deep, research)
+- provider routing with cooldowns, fallback, and budgets
+- search result normalization and fusion
+- page fetch/extraction and optional PDF extraction
+- optional Vane deep synthesis
+- evidence/citation assembly
+- structured response construction
+- diagnostics, provider traces, and cache reporting
+- MCP tools mounted on the same ASGI app at `/mcp`
 
-The repository now supports a single Open-WebUI surface: tools.
+The Open WebUI workspace tool becomes a thin HTTP wrapper.
 
-- The pipe/function implementation was removed.
-- `enhanced_websearch.py` is the only supported execution path.
-- Core logic is driven by one canonical research pipeline (`_run_research`) with a thin Open-WebUI entrypoint (`elevated_search`).
+## Project structure
 
-## Current Module
+- app/main.py: FastAPI app + dependency wiring
+- app/api/routes.py: HTTP endpoints
+- app/core/config.py: YAML + env config loading
+- app/providers/: provider implementations + router
+- app/services/: planner, ranker, fetch/extract, vane, orchestrator
+- app/cache/memory_cache.py: in-memory TTL cache
+- config/config.yaml: final service configuration used by compose
+- config/config.sample.yaml: template you can copy from
+- docker-compose.yml: single publishable service + optional dependencies
 
-### enhanced-websearch
+## API
 
-Structured web retrieval and research with:
+### POST /search
 
-- SearXNG search + query expansion + RRF
-- Concurrent scraping with FlareSolverr fallback
-- Optional Vane deep synthesis with fast fallback behavior
-- Execution modes: `auto`, `fast`, `deep`, `research`
-- Structured JSON response with citations and diagnostics
-- Runtime-aware compatibility layer with strict mode and degraded diagnostics
+Perplexity Search API-compatible endpoint for Open WebUI and other clients.
 
-See module docs: `enhanced-websearch/README.md`
+Request body supports at minimum:
 
-## Usage in Open-WebUI
+{
+  "query": "string or string[]",
+  "max_results": 10
+}
 
-1. Open Admin Panel in Open-WebUI.
-2. Import `enhanced-websearch/enhanced_websearch.py`.
-3. Configure admin valves (SearXNG required; Vane optional unless deep mode is used).
-4. Optionally configure user valves for mode/status/citations.
+It returns a JSON object with `id`, `results`, and optional `server_time`.
+Each result contains `title`, `url`, and `snippet`.
 
-## Development Notes
+Optional Perplexity-style extensions are also accepted, including:
 
-- Keep scripts standalone and import-ready for Open-WebUI.
-- Prefer configurable valves over hardcoded endpoints.
-- Keep Open-WebUI glue thin; business logic belongs in internal helpers.
+- display_server_time
+- country
+- max_tokens
+- max_tokens_per_page
+- search_language_filter
+- search_domain_filter
+- search_recency_filter
+- search_after_date_filter
+- search_before_date_filter
+- last_updated_after_filter
+- last_updated_before_filter
+- search_mode
+- mode
+
+Unknown fields are ignored.
+
+### POST /internal/search
+
+Request body:
+
+{
+  "query": "string",
+  "mode": "auto|fast|deep|research",
+  "source_mode": "web|academia|social|all",
+  "depth": "quick|balanced|quality",
+  "max_iterations": 4,
+  "include_citations": true,
+  "include_debug": false,
+  "include_legacy": false,
+  "strict_runtime": false,
+  "user_context": {}
+}
+
+Response shape is stable and includes:
+
+- query, mode, direct_answer, summary
+- findings, citations, sources, follow_up_queries
+- diagnostics: runtime, query_plan, provider_trace, cache, errors, warnings
+- timings.total_ms
+- confidence
+
+Optional legacy output is opt-in with include_legacy.
+
+### GET /health
+
+Returns service liveness.
+
+### GET /providers/health
+
+Returns provider-level state:
+
+- enabled
+- cooldown_until
+- consecutive_failures
+- last_success_at
+- last_failure_at
+- last_failure_reason
+
+### POST /fetch
+
+Fetches and extracts a single page.
+
+### POST /extract
+
+Returns structured metadata for a single page.
+
+### GET /config/effective
+
+Returns effective non-secret config for debugging.
+
+### GET /metrics
+
+Returns basic service metrics (cache size and provider count) for lightweight observability.
+
+### MCP tools at /mcp
+
+The same FastAPI app also mounts a FastMCP server at `/mcp`.
+
+Available tools:
+
+- search
+- perplexity_search
+- fetch_page
+- extract_page_structure
+- health_check
+- providers_health
+
+Optional bearer token:
+
+- set `EWS_BEARER_TOKEN` to require `Authorization: Bearer <token>` on the HTTP surfaces, including `/mcp`
+- leave it blank for local/trusted setups
+
+## Provider routing behavior
+
+Router strategy:
+
+- weighted rotating provider order
+- checks provider cooldown state
+- retries up to mode-specific budget
+- marks provider cooldown after rate-limit or repeated failures
+- falls back to next eligible provider
+- records provider trace in diagnostics
+
+Mode defaults (configurable):
+
+- fast: low attempts, low page count, one pass
+- deep: broader retrieval, optional Vane
+- research: iterative cycles with bounded follow-up queries
+- auto: heuristic selection based on query profile
+
+## Caching
+
+In-memory cache for v1:
+
+- search cache keyed by normalized query/mode/options
+- page fetch cache keyed by URL
+- separate TTL for recency-sensitive queries
+- hit/miss and cache stats exposed in diagnostics
+
+## Configuration
+
+1. Copy .env.example to .env
+2. Edit config/config.yaml and env values
+3. Keep secrets in env vars only
+
+LiteLLM gateway setup defaults:
+
+- use one shared key: LITELLM_API_KEY
+- choose active LiteLLM providers with comma-separated names:
+  LITELLM_ENABLED_PROVIDERS=brave-search,serper,exa,tavily
+
+Vane defaults:
+
+- VANE_ENABLED controls whether deep/research flows can call Vane
+- VANE_DEFAULT_MODE defaults to balanced and can be set to speed, balanced, or quality
+- deep/research requests can still escalate to quality when the query warrants it
+
+Startup logs include:
+
+- active and disabled providers
+- routing policy and cooldown settings
+- whether Vane is enabled, its URL, and its default optimization mode
+- cache settings
+
+YAML sections:
+
+- service
+- routing
+- modes
+- providers
+- cache
+- scraping
+- vane
+- logging
+
+## Run
+
+Local:
+
+- pip install -r requirements.txt
+- uvicorn app.main:app --host 0.0.0.0 --port 8091
+
+Docker compose:
+
+- cp .env.example .env
+- docker compose up -d --build
+
+## Open WebUI wrapper guidance
+
+Use a single-file Open WebUI tool that:
+
+- accepts tool arguments
+- calls POST /internal/search on this service
+- returns the service JSON unchanged
+- optionally proxies /fetch and /extract
+
+Keep wrapper logic minimal and stateless.
+
+## Optional bearer token
+
+If you want to protect the HTTP service and MCP server, set `EWS_BEARER_TOKEN` in `.env`.
+The Open WebUI wrapper will forward the same token automatically when it is present.
