@@ -39,6 +39,9 @@ class PageFetcher:
                 "title": url.split("/")[-1],
                 "content": text,
                 "source": "pdf",
+                "language": "",
+                "published_at": "",
+                "last_updated": "",
                 "error": None,
             }
 
@@ -50,6 +53,8 @@ class PageFetcher:
 
         soup = BeautifulSoup(html, "html.parser")
         title = soup.title.get_text(strip=True) if soup.title else str(resp.url)
+        language = self._detect_language(soup)
+        published_at, last_updated = self._extract_dates(soup, resp.headers)
         for node in soup(["script", "style", "noscript", "nav", "footer", "header", "aside"]):
             node.decompose()
         content = "\n".join([line.strip() for line in soup.get_text("\n").splitlines() if line.strip()])
@@ -58,6 +63,9 @@ class PageFetcher:
             "title": title,
             "content": content[: self.max_chars],
             "source": "html",
+            "language": language,
+            "published_at": published_at,
+            "last_updated": last_updated,
             "error": None,
         }
 
@@ -101,6 +109,50 @@ class PageFetcher:
                 break
 
         return out
+
+    def _detect_language(self, soup: BeautifulSoup) -> str:
+        html_tag = soup.find("html")
+        if html_tag and html_tag.get("lang"):
+            return html_tag.get("lang", "").split("-")[0].lower().strip()
+
+        meta_lang = soup.find("meta", attrs={"http-equiv": re.compile("content-language", re.I)})
+        if meta_lang and meta_lang.get("content"):
+            return str(meta_lang.get("content", "")).split(",")[0].split("-")[0].lower().strip()
+        return ""
+
+    def _extract_dates(self, soup: BeautifulSoup, headers: httpx.Headers) -> tuple[str, str]:
+        published_at = ""
+        last_updated = ""
+
+        publish_keys = [
+            ("property", "article:published_time"),
+            ("name", "pubdate"),
+            ("name", "publish_date"),
+            ("name", "date"),
+        ]
+        update_keys = [
+            ("property", "article:modified_time"),
+            ("name", "lastmod"),
+            ("name", "last-modified"),
+            ("name", "updated_time"),
+        ]
+
+        for key, value in publish_keys:
+            node = soup.find("meta", attrs={key: value})
+            if node and node.get("content"):
+                published_at = str(node.get("content", "")).strip()
+                break
+
+        for key, value in update_keys:
+            node = soup.find("meta", attrs={key: value})
+            if node and node.get("content"):
+                last_updated = str(node.get("content", "")).strip()
+                break
+
+        if not last_updated:
+            last_updated = str(headers.get("last-modified") or "").strip()
+
+        return published_at, last_updated
 
     def _looks_blocked(self, status_code: int, html: str) -> bool:
         if status_code in {403, 429, 503}:

@@ -102,6 +102,12 @@ vane:
   embedding_provider_id_env: VANE_EMBED_PROVIDER_ID
   embedding_model_key: Xenova/nomic-embed-text-v1
 
+compiler:
+  enabled: false
+  base_url: ${LITELLM_SEARCH_BASE_URL}
+  timeout_s: 20
+  model_id: ""
+
 logging:
   level: INFO
   json: false

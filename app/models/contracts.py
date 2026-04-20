@@ -53,6 +53,10 @@ class PerplexitySearchResult(BaseModel):
     snippet: str
     date: Optional[str] = None
     last_updated: Optional[str] = None
+    citation_ids: Optional[List[int]] = None
+    evidence_spans: Optional[List[str]] = None
+    confidence: Optional[float] = None
+    grounding_notes: Optional[str] = None
 
 
 class PerplexitySearchResponse(BaseModel):
@@ -84,6 +88,8 @@ class Citation(BaseModel):
     source: str
     excerpt: str
     published_at: str = ""
+    last_updated: Optional[str] = None
+    language: Optional[str] = None
     relevance_score: float
     passage_id: str
 

@@ -4,7 +4,9 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 from app.api import routes
 from app.cache.memory_cache import InMemoryCache
@@ -16,6 +18,7 @@ from app.providers.litellm_search import LiteLLMSearchProvider
 from app.providers.router import ProviderRouter, ProviderSlot
 from app.providers.searxng import SearxngProvider
 from app.services.fetcher import PageFetcher
+from app.services.compiler import ResultCompiler
 from app.services.orchestrator import ResearchOrchestrator
 from app.services.planner import QueryPlanner
 from app.services.ranking import Ranker
@@ -80,6 +83,13 @@ def _build_orchestrator(config: AppConfig, router: ProviderRouter) -> ResearchOr
         embedding_model_key=config.vane.embedding_model_key,
     )
 
+    compiler = ResultCompiler(
+        enabled=config.compiler.enabled,
+        base_url=config.compiler.base_url,
+        timeout_s=config.compiler.timeout_s,
+        model_id=config.compiler.model_id,
+    )
+
     return ResearchOrchestrator(
         config=config,
         router=router,
@@ -89,6 +99,7 @@ def _build_orchestrator(config: AppConfig, router: ProviderRouter) -> ResearchOr
         planner=QueryPlanner(),
         ranker=Ranker(),
         vane=vane,
+        compiler=compiler,
     )
 
 
@@ -148,3 +159,46 @@ app.add_middleware(
 )
 app.include_router(routes.router)
 app.mount("/mcp", mcp_app)
+
+
+def _perplexity_error(status_code: int, error_type: str, message: str, param: str | None = None) -> JSONResponse:
+    body = {"error": {"type": error_type, "message": message}}
+    if param:
+        body["error"]["param"] = param
+    return JSONResponse(body, status_code=status_code)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    if request.url.path == "/search":
+        first_error = exc.errors()[0] if exc.errors() else {}
+        loc = first_error.get("loc", [])
+        param = loc[-1] if isinstance(loc, list) and loc else None
+        message = first_error.get("msg", "Invalid request")
+        return _perplexity_error(400, "invalid_request_error", message, str(param) if param else None)
+    return JSONResponse({"detail": exc.errors()}, status_code=422)
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    if request.url.path == "/search":
+        detail = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
+        if exc.status_code == 401:
+            return _perplexity_error(401, "authentication_error", detail)
+        if exc.status_code == 403:
+            return _perplexity_error(403, "permission_error", detail)
+        if exc.status_code == 429:
+            return _perplexity_error(429, "rate_limit_error", detail)
+        if 400 <= exc.status_code < 500:
+            return _perplexity_error(exc.status_code, "invalid_request_error", detail)
+        return _perplexity_error(exc.status_code, "internal_error", detail)
+    return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    if request.url.path == "/search":
+        logger.exception("Unhandled /search error: %s", exc)
+        return _perplexity_error(500, "internal_error", "Internal server error")
+    logger.exception("Unhandled error: %s", exc)
+    return JSONResponse({"detail": "Internal server error"}, status_code=500)

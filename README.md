@@ -63,6 +63,13 @@ Optional Perplexity-style extensions are also accepted, including:
 - search_mode
 - mode
 
+The endpoint also enforces:
+
+- domain filters
+- language filters (best-effort by URL/language metadata)
+- recency/date filters when date metadata is available
+- per-page and total token limits for snippets
+
 Unknown fields are ignored.
 
 ### POST /internal/search
@@ -179,6 +186,21 @@ LiteLLM gateway setup defaults:
 - use one shared key: LITELLM_API_KEY
 - choose active LiteLLM providers with comma-separated names:
   LITELLM_ENABLED_PROVIDERS=brave-search,serper,exa,tavily
+
+Optional LLM result compiler (Perplexity `/search` response refinement):
+
+- set `EWS_COMPILER_ENABLED=true` to enable
+- set `EWS_COMPILER_MODEL_ID` to the LiteLLM chat model id to use
+- set `EWS_COMPILER_BASE_URL` to your LiteLLM base (`.../v1` recommended)
+- set `EWS_COMPILER_API_KEY` for a compiler-specific auth key
+- if `EWS_COMPILER_API_KEY` is unset, compiler falls back to `LITELLM_API_KEY`
+
+When compiler output is accepted, each result may also include optional grounding metadata:
+
+- `citation_ids`: candidate ids used to ground the item
+- `evidence_spans`: short grounded excerpts
+- `confidence`: normalized 0..1 confidence from compiler
+- `grounding_notes`: optional short rationale
 
 Vane defaults:
 

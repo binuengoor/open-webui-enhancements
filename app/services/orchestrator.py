@@ -5,7 +5,7 @@ import logging
 import re
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Tuple
 from urllib.parse import urlparse
 
@@ -17,6 +17,7 @@ from app.providers.router import ProviderRouter
 from app.services.fetcher import PageFetcher
 from app.services.planner import QueryPlanner
 from app.services.ranking import Ranker
+from app.services.compiler import ResultCompiler
 from app.services.vane import VaneClient
 
 
@@ -34,6 +35,7 @@ class ResearchOrchestrator:
         planner: QueryPlanner,
         ranker: Ranker,
         vane: VaneClient,
+        compiler: ResultCompiler,
     ):
         self.config = config
         self.router = router
@@ -43,6 +45,7 @@ class ResearchOrchestrator:
         self.planner = planner
         self.ranker = ranker
         self.vane = vane
+        self.compiler = compiler
 
     async def execute_search(self, req: SearchRequest) -> SearchResponse:
         request_id = uuid.uuid4().hex[:8]
@@ -205,6 +208,9 @@ class ResearchOrchestrator:
     async def execute_perplexity_search(self, req: PerplexitySearchRequest) -> PerplexitySearchResponse:
         request_id = req.trace_id or uuid.uuid4().hex[:8]
         queries = self._normalize_queries(req.query)
+        if not queries:
+            raise ValueError("query is required")
+
         mode = req.mode or self._infer_compat_mode(req)
         source_mode = self._map_search_mode(req.search_mode)
         results: List[PerplexitySearchResult] = []
@@ -247,7 +253,23 @@ class ResearchOrchestrator:
             )
             response = await self.execute_search(internal)
             items = self._perplexity_results_from_response(response)
-            items = self._filter_perplexity_results(items, req.search_domain_filter or [])
+            items = self._apply_perplexity_filters(items, req)
+
+            compiler_input = []
+            for idx, item in enumerate(items, start=1):
+                payload = item.model_dump(exclude_none=True)
+                payload["candidate_id"] = idx
+                compiler_input.append(payload)
+            compiled = await self.compiler.compile_perplexity_results(
+                query=query,
+                candidates=compiler_input,
+                max_results=req.max_results,
+                max_tokens_per_page=req.max_tokens_per_page,
+            )
+            if compiled:
+                items = [PerplexitySearchResult.model_validate(item) for item in compiled]
+
+            items = self._apply_token_limits(items, req.max_tokens_per_page, req.max_tokens)
             for item in items:
                 if item.url in seen_urls:
                     continue
@@ -409,7 +431,7 @@ class ResearchOrchestrator:
                     url=url,
                     snippet=snippet,
                     date=citation.get("published_at") or None,
-                    last_updated=None,
+                    last_updated=citation.get("last_updated") or None,
                 )
             )
         if not results and response.direct_answer:
@@ -424,11 +446,20 @@ class ResearchOrchestrator:
             )
         return [item for item in results if item.url]
 
-    def _filter_perplexity_results(
-        self,
-        results: List[PerplexitySearchResult],
-        domain_filter: List[str],
-    ) -> List[PerplexitySearchResult]:
+    def _apply_perplexity_filters(self, results: List[PerplexitySearchResult], req: PerplexitySearchRequest) -> List[PerplexitySearchResult]:
+        filtered = self._filter_perplexity_results(results, req.search_domain_filter or [])
+        filtered = self._filter_language_results(filtered, req.search_language_filter or [])
+        filtered = self._filter_date_results(
+            filtered,
+            req.search_recency_filter,
+            req.search_after_date_filter,
+            req.search_before_date_filter,
+            req.last_updated_after_filter,
+            req.last_updated_before_filter,
+        )
+        return filtered
+
+    def _filter_perplexity_results(self, results: List[PerplexitySearchResult], domain_filter: List[str]) -> List[PerplexitySearchResult]:
         if not domain_filter:
             return results
 
@@ -444,6 +475,155 @@ class ResearchOrchestrator:
                 continue
             filtered.append(item)
         return filtered
+
+    def _filter_language_results(self, results: List[PerplexitySearchResult], language_filter: List[str]) -> List[PerplexitySearchResult]:
+        if not language_filter:
+            return results
+
+        allowed = {lang.lower().strip() for lang in language_filter if lang and len(lang.strip()) == 2}
+        if not allowed:
+            return results
+
+        tld_map = {
+            "fr": {"fr"},
+            "de": {"de"},
+            "es": {"es"},
+            "it": {"it"},
+            "pt": {"pt", "br"},
+            "nl": {"nl"},
+            "ja": {"jp"},
+            "ko": {"kr"},
+            "zh": {"cn", "hk", "tw"},
+            "en": {"com", "org", "net", "io", "us", "uk", "ca", "au"},
+        }
+
+        filtered: List[PerplexitySearchResult] = []
+        for item in results:
+            host = urlparse(item.url).netloc.lower()
+            tld = host.split(".")[-1] if "." in host else ""
+            inferred_langs = {lang for lang, tlds in tld_map.items() if tld in tlds}
+            if inferred_langs & allowed:
+                filtered.append(item)
+        return filtered if filtered else results
+
+    def _filter_date_results(
+        self,
+        results: List[PerplexitySearchResult],
+        recency: str | None,
+        published_after: str | None,
+        published_before: str | None,
+        updated_after: str | None,
+        updated_before: str | None,
+    ) -> List[PerplexitySearchResult]:
+        if not any([recency, published_after, published_before, updated_after, updated_before]):
+            return results
+
+        now = datetime.now(timezone.utc)
+        recency_after = None
+        if recency == "hour":
+            recency_after = now - timedelta(hours=1)
+        elif recency == "day":
+            recency_after = now - timedelta(days=1)
+        elif recency == "week":
+            recency_after = now - timedelta(days=7)
+        elif recency == "month":
+            recency_after = now - timedelta(days=31)
+        elif recency == "year":
+            recency_after = now - timedelta(days=366)
+
+        pub_after_dt = self._parse_date(published_after)
+        pub_before_dt = self._parse_date(published_before)
+        upd_after_dt = self._parse_date(updated_after)
+        upd_before_dt = self._parse_date(updated_before)
+
+        filtered: List[PerplexitySearchResult] = []
+        for item in results:
+            published_dt = self._parse_date(item.date)
+            updated_dt = self._parse_date(item.last_updated)
+
+            if recency_after and published_dt and published_dt < recency_after:
+                continue
+            if pub_after_dt and published_dt and published_dt < pub_after_dt:
+                continue
+            if pub_before_dt and published_dt and published_dt > pub_before_dt:
+                continue
+            if upd_after_dt and updated_dt and updated_dt < upd_after_dt:
+                continue
+            if upd_before_dt and updated_dt and updated_dt > upd_before_dt:
+                continue
+            filtered.append(item)
+
+        return filtered
+
+    def _parse_date(self, value: str | None) -> datetime | None:
+        if not value:
+            return None
+        text = value.strip()
+        if not text:
+            return None
+        try:
+            if "/" in text:
+                return datetime.strptime(text, "%m/%d/%Y").replace(tzinfo=timezone.utc)
+            normalized = text.replace("Z", "+00:00")
+            dt = datetime.fromisoformat(normalized)
+            if dt.tzinfo is None:
+                return dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc)
+        except Exception:
+            return None
+
+    def _apply_token_limits(
+        self,
+        results: List[PerplexitySearchResult],
+        max_tokens_per_page: int | None,
+        max_tokens: int | None,
+    ) -> List[PerplexitySearchResult]:
+        capped: List[PerplexitySearchResult] = []
+        remaining = max_tokens if max_tokens is not None else None
+
+        per_page_limit = max_tokens_per_page or 0
+        for item in results:
+            snippet = item.snippet or ""
+            if per_page_limit > 0:
+                snippet = self._truncate_to_tokens(snippet, per_page_limit)
+
+            token_count = self._estimate_tokens(snippet)
+            if remaining is not None:
+                if remaining <= 0:
+                    break
+                if token_count > remaining:
+                    snippet = self._truncate_to_tokens(snippet, remaining)
+                    token_count = self._estimate_tokens(snippet)
+                remaining -= token_count
+
+            capped.append(
+                PerplexitySearchResult(
+                    title=item.title,
+                    url=item.url,
+                    snippet=snippet,
+                    date=item.date,
+                    last_updated=item.last_updated,
+                    citation_ids=item.citation_ids,
+                    evidence_spans=item.evidence_spans,
+                    confidence=item.confidence,
+                    grounding_notes=item.grounding_notes,
+                )
+            )
+        return capped
+
+    def _estimate_tokens(self, text: str) -> int:
+        if not text:
+            return 0
+        return max(1, int(len(text.split()) * 1.3))
+
+    def _truncate_to_tokens(self, text: str, max_tokens: int) -> str:
+        if max_tokens <= 0:
+            return ""
+        words = text.split()
+        if not words:
+            return ""
+        approx_words = max(1, int(max_tokens / 1.3))
+        return " ".join(words[:approx_words])
     def _cache_key(self, query: str, mode: str, options: Dict[str, Any]) -> str:
         body = f"{query.lower().strip()}|{mode}|{sorted(options.items())}"
         digest = hashlib.sha256(body.encode("utf-8")).hexdigest()[:20]
@@ -485,7 +665,9 @@ class ResearchOrchestrator:
                     "url": url,
                     "source": source,
                     "excerpt": self._best_excerpt(page.get("content", ""), query),
-                    "published_at": "",
+                    "published_at": page.get("published_at", ""),
+                    "last_updated": page.get("last_updated") or None,
+                    "language": page.get("language") or None,
                     "relevance_score": round(float(page.get("quality_score", 0.0)), 3),
                     "passage_id": f"p{idx}-{re.sub(r'[^a-z0-9]+', '-', source)[:40] or 'source'}",
                 }

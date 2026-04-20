@@ -65,6 +65,13 @@ class VaneConfig(BaseModel):
     embedding_model_key: str = "Xenova/nomic-embed-text-v1"
 
 
+class CompilerConfig(BaseModel):
+    enabled: bool = False
+    base_url: str = ""
+    timeout_s: int = 20
+    model_id: str = ""
+
+
 class LoggingConfig(BaseModel):
     level: str = "INFO"
     json: bool = False
@@ -78,6 +85,7 @@ class AppConfig(BaseModel):
     cache: CacheConfig = Field(default_factory=CacheConfig)
     scraping: ScrapingConfig = Field(default_factory=ScrapingConfig)
     vane: VaneConfig = Field(default_factory=VaneConfig)
+    compiler: CompilerConfig = Field(default_factory=CompilerConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
 
 
@@ -136,6 +144,23 @@ def _apply_env_overrides(payload: dict) -> dict:
     payload["vane"]["embedding_model_key"] = _env(
         "VANE_EMBED_MODEL_KEY",
         payload["vane"].get("embedding_model_key", "Xenova/nomic-embed-text-v1"),
+    )
+
+    payload.setdefault("compiler", {})
+    payload["compiler"]["enabled"] = _env(
+        "EWS_COMPILER_ENABLED",
+        str(payload["compiler"].get("enabled", False)),
+    ).lower() in {"1", "true", "yes", "on"}
+    payload["compiler"]["base_url"] = _env(
+        "EWS_COMPILER_BASE_URL",
+        payload["compiler"].get("base_url", _env("LITELLM_SEARCH_BASE_URL", "")),
+    )
+    payload["compiler"]["timeout_s"] = int(
+        _env("EWS_COMPILER_TIMEOUT", str(payload["compiler"].get("timeout_s", 20)))
+    )
+    payload["compiler"]["model_id"] = _env(
+        "EWS_COMPILER_MODEL_ID",
+        payload["compiler"].get("model_id", ""),
     )
 
     shared_litellm_key_env = "LITELLM_API_KEY"

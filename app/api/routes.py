@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.core.config import redacted_config
 from app.models.contracts import (
@@ -36,7 +36,10 @@ async def perplexity_search(
     payload: PerplexitySearchRequest,
     orch: ResearchOrchestrator = Depends(get_orchestrator),
 ):
-    response = await orch.execute_perplexity_search(payload)
+    try:
+        response = await orch.execute_perplexity_search(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return response.model_dump(exclude_none=True)
 
 
