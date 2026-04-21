@@ -1,18 +1,28 @@
 from __future__ import annotations
 
+import asyncio
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
 
 from app.core.config import redacted_config
 from app.models.contracts import (
     ExtractRequest,
     FetchRequest,
     PerplexitySearchRequest,
+    ProgressEvent,
     ResearchRequest,
     SearchRequest,
 )
 from app.services.orchestrator import ResearchOrchestrator
 
 router = APIRouter()
+
+
+def _sse_event(name: str, payload: dict) -> str:
+    return f"event: {name}\ndata: {json.dumps(payload)}\n\n"
+
 
 def get_orchestrator(request: Request) -> ResearchOrchestrator:
     return request.app.state.orchestrator
@@ -60,23 +70,70 @@ async def perplexity_search(
 @router.post("/research")
 async def research_search(
     payload: ResearchRequest,
+    request: Request,
     orch: ResearchOrchestrator = Depends(get_orchestrator),
 ):
-    response = await orch.execute_search(
-        SearchRequest(
-            query=payload.query,
-            mode="research",
-            source_mode=payload.source_mode,
-            depth=payload.depth,
-            max_iterations=payload.max_iterations,
-            include_citations=True,
-            include_debug=payload.include_debug,
-            include_legacy=payload.include_legacy,
-            strict_runtime=payload.strict_runtime,
-            user_context=payload.user_context,
-        )
+    internal_request = SearchRequest(
+        query=payload.query,
+        mode="research",
+        source_mode=payload.source_mode,
+        depth=payload.depth,
+        max_iterations=payload.max_iterations,
+        include_citations=True,
+        include_debug=payload.include_debug,
+        include_legacy=payload.include_legacy,
+        strict_runtime=payload.strict_runtime,
+        user_context=payload.user_context,
     )
-    return response.model_dump()
+
+    stream_progress = request.query_params.get("stream") == "true"
+    if not stream_progress:
+        response = await orch.execute_search(internal_request)
+        return response.model_dump()
+
+    async def event_stream():
+        queue: asyncio.Queue[ProgressEvent | dict | None] = asyncio.Queue()
+
+        async def on_progress(event: ProgressEvent) -> None:
+            await queue.put(event)
+
+        async def run_search() -> None:
+            try:
+                response = await orch.execute_search(internal_request, progress_callback=on_progress)
+                await queue.put({"type": "result", "payload": response.model_dump()})
+            except Exception as exc:
+                await queue.put(
+                    ProgressEvent(
+                        type="error",
+                        state="error",
+                        request_id="unknown",
+                        mode="research",
+                        error=str(exc),
+                        message="Search failed",
+                    )
+                )
+            finally:
+                await queue.put(None)
+
+        task = asyncio.create_task(run_search())
+        try:
+            while True:
+                item = await queue.get()
+                if item is None:
+                    break
+                if isinstance(item, ProgressEvent):
+                    yield _sse_event(item.type, item.model_dump(exclude_none=True))
+                else:
+                    yield _sse_event(item["type"], item["payload"])
+        finally:
+            if not task.done():
+                task.cancel()
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+    )
 
 
 @router.post("/fetch")

@@ -7,13 +7,13 @@ import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from collections import Counter
-from typing import Any, Dict, List, Tuple
+from typing import Any, Awaitable, Callable, Dict, List, Tuple
 from urllib.parse import urlparse
 
 from app.cache.memory_cache import InMemoryCache
 from app.core.config import AppConfig
 from app.models.contracts import PerplexitySearchRequest, PerplexitySearchResponse, PerplexitySearchResult
-from app.models.contracts import ResearchPlan, RoutingDecision, SearchDiagnostics, SearchRequest, SearchResponse
+from app.models.contracts import ProgressEvent, ResearchPlan, RoutingDecision, SearchDiagnostics, SearchRequest, SearchResponse
 from app.providers.router import ProviderRouter
 from app.services.fetcher import PageFetcher
 from app.services.planner import QueryPlanner
@@ -23,6 +23,8 @@ from app.services.vane import VaneClient
 
 
 logger = logging.getLogger(__name__)
+
+ProgressCallback = Callable[[ProgressEvent], Awaitable[None]]
 
 
 class ResearchOrchestrator:
@@ -48,7 +50,11 @@ class ResearchOrchestrator:
         self.vane = vane
         self.compiler = compiler
 
-    async def execute_search(self, req: SearchRequest) -> SearchResponse:
+    async def execute_search(
+        self,
+        req: SearchRequest,
+        progress_callback: ProgressCallback | None = None,
+    ) -> SearchResponse:
         request_id = uuid.uuid4().hex[:8]
         started = time.perf_counter()
         routing_decision = RoutingDecision.model_validate(self.planner.build_route_decision(req.mode, req.query))
@@ -82,9 +88,29 @@ class ResearchOrchestrator:
         if selected_mode == "research":
             iterations = min(req.max_iterations, mode_budget.max_queries)
 
+        await self._emit_progress(
+            progress_callback,
+            type="progress",
+            state="search_started",
+            request_id=request_id,
+            mode=selected_mode,
+            message="Search started",
+            total_cycles=iterations,
+        )
+
         seen_titles: List[str] = []
         for cycle in range(iterations):
             query_text = plan[min(cycle, len(plan) - 1)]["text"] if cycle < len(plan) else req.query
+            await self._emit_progress(
+                progress_callback,
+                type="progress",
+                state="search_started",
+                request_id=request_id,
+                mode=selected_mode,
+                message=f"Running search cycle {cycle + 1} of {iterations}",
+                cycle=cycle + 1,
+                total_cycles=iterations,
+            )
             if cycle > 0 and selected_mode == "research":
                 query_text = self.planner.followup_query(req.query, seen_titles)
                 plan.append({"step": "followup", "text": query_text, "purpose": "followup"})
@@ -124,6 +150,15 @@ class ResearchOrchestrator:
         fused = self.ranker.fuse(all_result_sets)
         diverse = self.ranker.diversity_filter(fused, mode_budget.max_pages_to_fetch)
 
+        await self._emit_progress(
+            progress_callback,
+            type="progress",
+            state="evidence_gathering",
+            request_id=request_id,
+            mode=selected_mode,
+            message="Fetching and ranking source pages",
+            total_cycles=iterations,
+        )
         pages = await self._fetch_pages(req.query, diverse)
         evidence = self._gather_evidence(req.query, pages, selected_mode)
         citations = evidence["citations"]
@@ -134,6 +169,15 @@ class ResearchOrchestrator:
         confidence = self._confidence(pages, errors)
 
         deep_synthesis = None
+        await self._emit_progress(
+            progress_callback,
+            type="progress",
+            state="synthesizing",
+            request_id=request_id,
+            mode=selected_mode,
+            message="Synthesizing findings",
+            total_cycles=iterations,
+        )
         if selected_mode in {"deep", "research"}:
             vane_depth = self._select_vane_depth(req.query, req.depth, selected_mode)
             logger.info(
@@ -246,6 +290,17 @@ class ResearchOrchestrator:
             payload["timings"]["total_ms"],
             len(errors),
             len(warnings),
+        )
+
+        await self._emit_progress(
+            progress_callback,
+            type="complete",
+            state="complete",
+            request_id=request_id,
+            mode=selected_mode,
+            message="Search complete",
+            total_cycles=iterations,
+            timings=payload["timings"],
         )
 
         return SearchResponse.model_validate(payload)
@@ -883,6 +938,16 @@ class ResearchOrchestrator:
             return ""
         approx_words = max(1, int(max_tokens / 1.3))
         return " ".join(words[:approx_words])
+
+    async def _emit_progress(
+        self,
+        progress_callback: ProgressCallback | None,
+        **event: Any,
+    ) -> None:
+        if progress_callback is None:
+            return
+        await progress_callback(ProgressEvent.model_validate(event))
+
     def _cache_key(self, query: str, mode: str, options: Dict[str, Any]) -> str:
         body = f"{query.lower().strip()}|{mode}|{sorted(options.items())}"
         digest = hashlib.sha256(body.encode("utf-8")).hexdigest()[:20]

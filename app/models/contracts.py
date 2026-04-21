@@ -170,6 +170,24 @@ class SearchResponse(BaseModel):
     legacy: Optional[Dict[str, Any]] = None
 
 
+class ProgressEvent(BaseModel):
+    type: Literal["progress", "complete", "error"]
+    state: Literal[
+        "search_started",
+        "evidence_gathering",
+        "synthesizing",
+        "complete",
+        "error",
+    ]
+    request_id: str
+    mode: ExecutionMode
+    message: Optional[str] = None
+    cycle: Optional[int] = None
+    total_cycles: Optional[int] = None
+    timings: Optional[Dict[str, int]] = None
+    error: Optional[str] = None
+
+
 class ProviderHealthRecord(BaseModel):
     name: str
     enabled: bool
