@@ -77,8 +77,13 @@ class ProviderRouter:
             rec.cooldown_until = time.time() + self._cooldown_seconds
 
     def _mark_empty_result(self, name: str) -> None:
-        # Repeated empty responses are usually a degraded provider, not a success.
-        self._mark_failure(name, "empty_results", rate_limited=False)
+        # Empty responses do not trigger cooldown on their own,
+        # but they are tracked so operators can observe provider behavior
+        # and distinguish content gaps from hard failures.
+        rec = self._health[name]
+        rec.consecutive_empty_results += 1
+        rec.last_failure_at = time.time()
+        rec.last_failure_reason = "empty_results"
 
     async def routed_search(
         self,

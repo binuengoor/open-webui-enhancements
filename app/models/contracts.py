@@ -151,6 +151,9 @@ class ProviderHealthRecord(BaseModel):
     last_success_at: float = 0.0
     last_failure_at: float = 0.0
     last_failure_reason: str = ""
+    # Empty results are tracked separately — they don't count toward cooldown
+    # but signal when a provider may be returning no content for queries.
+    consecutive_empty_results: int = 0
 
 
 class ProviderResult(BaseModel):
