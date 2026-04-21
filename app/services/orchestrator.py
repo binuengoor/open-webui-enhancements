@@ -6,6 +6,7 @@ import re
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
+from collections import Counter
 from typing import Any, Dict, List, Tuple
 from urllib.parse import urlparse
 
@@ -124,9 +125,12 @@ class ResearchOrchestrator:
         diverse = self.ranker.diversity_filter(fused, mode_budget.max_pages_to_fetch)
 
         pages = await self._fetch_pages(req.query, diverse)
-        citations = self._build_citations(req.query, pages)
-        findings = self._build_findings(citations)
-        sources = self._build_sources(citations)
+        evidence = self._gather_evidence(req.query, pages, selected_mode)
+        citations = evidence["citations"]
+        findings = evidence["findings"]
+        sources = evidence["sources"]
+        summary = self._build_summary(req.query, findings, citations, selected_mode)
+        direct_answer = self._build_direct_answer(req.query, findings, summary, selected_mode)
         confidence = self._confidence(pages, errors)
 
         deep_synthesis = None
@@ -143,9 +147,6 @@ class ResearchOrchestrator:
             deep_synthesis = await self.vane.deep_search(req.query, req.source_mode, vane_depth)
             if deep_synthesis.get("error"):
                 warnings.append(f"Vane unavailable: {deep_synthesis['error']}")
-
-        direct_answer = findings[0]["claim"] if findings else ""
-        summary = f"Collected {len(citations)} citations across {len(sources)} sources using mode={selected_mode}."
 
         runtime = {
             "strict_runtime": req.strict_runtime,
@@ -173,6 +174,7 @@ class ResearchOrchestrator:
                 "search": search_cache_state,
                 "page": self.page_cache.stats(),
             },
+            synthesis=evidence["diagnostics"],
         )
 
         payload: Dict[str, Any] = {
@@ -568,19 +570,15 @@ class ResearchOrchestrator:
                     "passage_id": f"fallback-{idx}",
                 }
             )
-            findings.append({"claim": result.title or result.snippet or result.url, "citation_ids": [idx]})
+            findings.append({"claim": self._summarize_text(result.snippet or result.title or result.url), "citation_ids": [idx]})
             sources.append({"title": result.title, "url": result.url, "source": urlparse(result.url).netloc or "search"})
 
-        direct_answer = ""
-        if fallback_response.results:
-            top = fallback_response.results[0]
-            direct_answer = top.snippet.strip() or top.title.strip() or top.url
-
         summary = (
-            f"Final vetting rejected the long-form response, so a quick grounded search fallback returned {len(citations)} results."
+            f"Final vetting rejected the long-form response, so a quick grounded fallback gathered {len(citations)} corroborating results."
             if citations
-            else "Final vetting rejected the long-form response, and the fallback search returned no results."
+            else "Final vetting rejected the long-form response, and the fallback search returned no grounded results."
         )
+        direct_answer = self._build_direct_answer(req.query, findings, summary, "fast")
 
         diagnostics = dict(original_payload.get("diagnostics", {}))
         diagnostics.setdefault("warnings", [])
@@ -889,6 +887,22 @@ class ResearchOrchestrator:
                 best_score = score
         return (best or lines[0])[:320]
 
+    def _gather_evidence(self, query: str, pages: List[Dict[str, Any]], mode: str) -> Dict[str, Any]:
+        citations = self._build_citations(query, pages)
+        findings = self._build_findings(query, citations, mode)
+        sources = self._build_sources(citations)
+        return {
+            "citations": citations,
+            "findings": findings,
+            "sources": sources,
+            "diagnostics": {
+                "stage": "evidence_gathering",
+                "mode_profile": self._mode_profile(mode),
+                "citation_count": len(citations),
+                "finding_count": len(findings),
+            },
+        }
+
     def _build_citations(self, query: str, pages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         citations = []
         for idx, page in enumerate(pages[:10], start=1):
@@ -911,12 +925,14 @@ class ResearchOrchestrator:
             )
         return citations
 
-    def _build_findings(self, citations: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _build_findings(self, query: str, citations: List[Dict[str, Any]], mode: str) -> List[Dict[str, Any]]:
         findings = []
-        for item in citations[:6]:
-            excerpt = item.get("excerpt", "")
-            if excerpt:
-                findings.append({"claim": excerpt, "citation_ids": [item["id"]]})
+        citation_clusters = self.ranker.cluster_citations(query, citations)
+        for cluster in citation_clusters[:6]:
+            claim = self._synthesize_claim(query, cluster, mode)
+            citation_ids = [item["id"] for item in cluster if item.get("id")]
+            if claim and citation_ids:
+                findings.append({"claim": claim, "citation_ids": citation_ids})
         return findings
 
     def _build_sources(self, citations: List[Dict[str, Any]]) -> List[Dict[str, str]]:
@@ -935,6 +951,62 @@ class ResearchOrchestrator:
                 }
             )
         return sources
+
+    def _build_summary(self, query: str, findings: List[Dict[str, Any]], citations: List[Dict[str, Any]], mode: str) -> str:
+        if not findings:
+            return "No grounded synthesis was produced from the fetched sources."
+        lead = findings[0]["claim"]
+        support = f"Supported by {len(citations)} citations across {len(self._build_sources(citations))} sources."
+        if mode == "research" and len(findings) > 1:
+            return f"{lead} The research pass also surfaced {len(findings) - 1} additional grounded finding(s). {support}"
+        if mode == "deep" and len(findings) > 1:
+            return f"{lead} Additional evidence highlights tradeoffs and corroborating context. {support}"
+        return f"{lead} {support}"
+
+    def _build_direct_answer(self, query: str, findings: List[Dict[str, Any]], summary: str, mode: str) -> str:
+        if findings:
+            answer = findings[0]["claim"]
+            if mode == "research" and len(findings) > 1:
+                return f"{answer} Key supporting points: {'; '.join(item['claim'] for item in findings[1:3])}."
+            return answer
+        return summary
+
+    def _mode_profile(self, mode: str) -> Dict[str, str]:
+        if mode == "research":
+            return {"answer_style": "multi-finding synthesis", "search_behavior": "iterative follow-up collection"}
+        if mode == "deep":
+            return {"answer_style": "focused synthesis", "search_behavior": "single-pass high-quality collection"}
+        return {"answer_style": "concise synthesis", "search_behavior": "single-pass collection"}
+
+    def _synthesize_claim(self, query: str, citations: List[Dict[str, Any]], mode: str) -> str:
+        excerpts = [item.get("excerpt", "").strip() for item in citations if item.get("excerpt")]
+        titles = [item.get("title", "").strip() for item in citations if item.get("title")]
+        lead_excerpt = self._summarize_text(excerpts[0]) if excerpts else ""
+        common_terms = self._common_terms(query, " ".join(excerpts + titles))
+        if not lead_excerpt:
+            return self._summarize_text(titles[0]) if titles else ""
+        if mode == "research" and len(citations) > 1 and common_terms:
+            return f"{lead_excerpt} Across sources, the recurring focus is {', '.join(common_terms[:3])}."
+        if len(citations) > 1:
+            return f"{lead_excerpt} This is corroborated by {len(citations)} sources."
+        return lead_excerpt
+
+    def _summarize_text(self, text: str) -> str:
+        cleaned = re.sub(r"\s+", " ", text or "").strip(" ;,-")
+        if not cleaned:
+            return ""
+        parts = re.split(r"(?<=[.!?])\s+|\s[;:-]\s", cleaned)
+        sentence = parts[0].strip() if parts else cleaned
+        return sentence[:280].rstrip(" ,;:-")
+
+    def _common_terms(self, query: str, text: str) -> List[str]:
+        query_terms = set(re.findall(r"[a-z0-9]+", query.lower()))
+        counts: Counter[str] = Counter()
+        for term in re.findall(r"[a-z0-9]+", text.lower()):
+            if len(term) < 4 or term in query_terms:
+                continue
+            counts[term] += 1
+        return [term for term, count in counts.most_common(5) if count > 1]
 
     def _confidence(self, pages: List[Dict[str, Any]], errors: List[str]) -> str:
         if not pages:

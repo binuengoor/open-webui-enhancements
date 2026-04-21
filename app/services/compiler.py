@@ -384,6 +384,7 @@ class ResultCompiler:
                 "citation_ids cannot be empty.",
                 "No duplicate URLs.",
                 "snippet must be concise and fully grounded in candidate snippets.",
+                "Prefer synthesized, claim-like snippets over copied excerpts when possible.",
                 "evidence_spans should be direct short excerpts from candidate snippets.",
                 "Return JSON only.",
             ],

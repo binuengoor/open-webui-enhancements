@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from collections import defaultdict
 from typing import Any, Dict, List
 from urllib.parse import urlparse
 
@@ -67,3 +68,22 @@ class Ranker:
             if len(out) >= max_items:
                 break
         return out
+
+    def cluster_citations(self, query: str, citations: List[Dict[str, Any]]) -> List[List[Dict[str, Any]]]:
+        grouped: dict[str, List[Dict[str, Any]]] = defaultdict(list)
+        query_terms = {term for term in re.findall(r"[a-z0-9]+", query.lower()) if len(term) > 3}
+
+        for citation in citations:
+            text = " ".join(
+                [
+                    str(citation.get("title", "")),
+                    str(citation.get("excerpt", "")),
+                    str(citation.get("source", "")),
+                ]
+            ).lower()
+            terms = [term for term in re.findall(r"[a-z0-9]+", text) if len(term) > 3 and term not in query_terms]
+            key = terms[0] if terms else citation.get("source", "unknown")
+            grouped[key].append(citation)
+
+        clusters = sorted(grouped.values(), key=lambda items: max((item.get("relevance_score", 0.0) for item in items), default=0.0), reverse=True)
+        return clusters

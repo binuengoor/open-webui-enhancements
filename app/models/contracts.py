@@ -152,6 +152,7 @@ class SearchDiagnostics(BaseModel):
     ranked_passage_count: int = 0
     provider_trace: List[Dict[str, Any]] = Field(default_factory=list)
     cache: Dict[str, Any] = Field(default_factory=dict)
+    synthesis: Dict[str, Any] = Field(default_factory=dict)
 
 
 class SearchResponse(BaseModel):
