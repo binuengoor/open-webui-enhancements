@@ -1163,9 +1163,13 @@ class ResearchOrchestrator:
         candidate = cleaned
         for paragraph in paragraphs:
             plain = re.sub(r"\s+", " ", paragraph).strip()
+            markdown_heading = bool(re.match(r"^#{1,6}\s+", plain))
             plain = re.sub(r"^[#*_`>\-\s]+", "", plain).strip()
             if not plain:
                 continue
+            if markdown_heading:
+                if len(plain) < 140 or not re.search(r"[.!?]", plain):
+                    continue
             if len(plain) < 40 and re.fullmatch(r"[A-Za-z ]+:?", plain):
                 continue
             candidate = plain
