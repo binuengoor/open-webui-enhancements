@@ -29,8 +29,8 @@ class ResearchPlanStep(BaseModel):
 class ResearchPlan(BaseModel):
     query: str
     mode: ExecutionMode
-    steps: List[ResearchPlanStep] = Field(default_factory=list)
-    max_iterations: int = 1
+    steps: List[ResearchPlanStep, ...] = Field(default_factory=list, max_length=20)
+    max_iterations: int = Field(default=1, ge=1, le=8)
     bounded: bool = True
 
 
