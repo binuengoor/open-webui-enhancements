@@ -1121,14 +1121,36 @@ class ResearchOrchestrator:
         vane_answer = (deep_synthesis.get("answer") or "").strip()
         vane_summary = (deep_synthesis.get("summary") or deep_synthesis.get("message") or "").strip()
 
+        # Vane often returns a long report in `message`; trim it before promotion
+        # so the API surfaces concise answer/summary text instead of raw dump-sized prose.
         if vane_answer:
-            direct_answer = vane_answer
+            direct_answer = self._condense_vane_text(vane_answer, max_len=700)
         if vane_summary:
-            summary = vane_summary
+            summary = self._condense_vane_text(vane_summary, max_len=400)
         elif vane_answer and mode == "research":
-            summary = vane_answer[:600].strip()
+            summary = self._condense_vane_text(vane_answer, max_len=400)
 
         return direct_answer, summary
+
+    def _condense_vane_text(self, text: str, max_len: int) -> str:
+        cleaned = re.sub(r"\s+", " ", text or "").strip()
+        if not cleaned:
+            return ""
+
+        # Prefer the first non-heading paragraph and cap it aggressively.
+        paragraphs = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
+        candidate = cleaned
+        for paragraph in paragraphs:
+            plain = re.sub(r"\s+", " ", paragraph).strip()
+            if plain and not plain.startswith("#"):
+                candidate = plain
+                break
+
+        sentences = re.split(r"(?<=[.!?])\s+", candidate)
+        summary = sentences[0].strip() if sentences else candidate
+        if len(summary) < min(120, max_len) and len(sentences) > 1:
+            summary = f"{summary} {sentences[1].strip()}".strip()
+        return summary[:max_len].rstrip(" ,;:-")
 
     def _select_vane_depth(self, query: str, requested_depth: str, mode: str) -> str:
         if requested_depth == "quick":
