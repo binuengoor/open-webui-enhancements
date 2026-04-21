@@ -187,6 +187,7 @@ class ResearchOrchestrator:
                     direct_answer=direct_answer,
                     summary=summary,
                     mode=selected_mode,
+                    requested_depth=req.depth,
                 )
                 logger.info(
                     "event=vane_promoted request_id=%s mode=%s has_answer=%s has_summary=%s",
@@ -1117,27 +1118,47 @@ class ResearchOrchestrator:
         direct_answer: str,
         summary: str,
         mode: str,
+        requested_depth: str,
     ) -> tuple[str, str]:
         vane_answer = (deep_synthesis.get("answer") or "").strip()
         vane_summary = (deep_synthesis.get("summary") or deep_synthesis.get("message") or "").strip()
 
-        # Vane often returns a long report in `message`; trim it before promotion
-        # so the API surfaces concise answer/summary text instead of raw dump-sized prose.
+        answer_limits, summary_limits = self._vane_shape_limits(mode, requested_depth)
         if vane_answer:
-            direct_answer = self._condense_vane_text(vane_answer, max_len=700)
+            direct_answer = self._condense_vane_text(vane_answer, **answer_limits)
         if vane_summary:
-            summary = self._condense_vane_text(vane_summary, max_len=400)
-        elif vane_answer and mode == "research":
-            summary = self._condense_vane_text(vane_answer, max_len=400)
+            summary = self._condense_vane_text(vane_summary, **summary_limits)
+        elif vane_answer:
+            summary = self._condense_vane_text(vane_answer, **summary_limits)
 
         return direct_answer, summary
 
-    def _condense_vane_text(self, text: str, max_len: int) -> str:
+    def _vane_shape_limits(self, mode: str, requested_depth: str) -> tuple[Dict[str, Any], Dict[str, Any]]:
+        if requested_depth == "quality":
+            return (
+                {"max_len": 2200, "max_sentences": 6},
+                {"max_len": 700, "max_sentences": 2},
+            )
+        if mode == "deep":
+            return (
+                {"max_len": 1800, "max_sentences": 5},
+                {"max_len": 600, "max_sentences": 2},
+            )
+        if mode == "research":
+            return (
+                {"max_len": 1200, "max_sentences": 4},
+                {"max_len": 450, "max_sentences": 2},
+            )
+        return (
+            {"max_len": 700, "max_sentences": 2},
+            {"max_len": 300, "max_sentences": 1},
+        )
+
+    def _condense_vane_text(self, text: str, max_len: int, max_sentences: int) -> str:
         cleaned = re.sub(r"\s+", " ", text or "").strip()
         if not cleaned:
             return ""
 
-        # Prefer the first non-heading paragraph and cap it aggressively.
         paragraphs = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
         candidate = cleaned
         for paragraph in paragraphs:
@@ -1151,15 +1172,23 @@ class ResearchOrchestrator:
             break
 
         candidate = re.sub(r"^[#*_`>\-\s]+", "", candidate).strip()
-        sentences = re.split(r"(?<=[.!?])\s+", candidate)
-        summary = sentences[0].strip() if sentences else candidate
-        if len(summary) < min(120, max_len) and len(sentences) > 1:
-            summary = f"{summary} {sentences[1].strip()}".strip()
-        return summary[:max_len].rstrip(" ,;:-")
+        sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", candidate) if s.strip()]
+        if not sentences:
+            return candidate[:max_len].rstrip(" ,;:-")
+
+        pieces = []
+        for sentence in sentences[:max_sentences]:
+            next_text = " ".join(pieces + [sentence]).strip()
+            if len(next_text) > max_len:
+                break
+            pieces.append(sentence)
+
+        condensed = " ".join(pieces).strip() if pieces else sentences[0].strip()
+        return condensed[:max_len].rstrip(" ,;:-")
 
     def _select_vane_depth(self, query: str, requested_depth: str, mode: str) -> str:
         if requested_depth == "quick":
-            return "quick"
+            return "balanced"
         if requested_depth == "quality":
             return "quality"
 
