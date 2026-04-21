@@ -147,11 +147,27 @@ class ResearchOrchestrator:
             deep_synthesis = await self.vane.deep_search(req.query, req.source_mode, vane_depth)
             if deep_synthesis.get("error"):
                 warnings.append(f"Vane unavailable: {deep_synthesis['error']}")
+            else:
+                direct_answer, summary = self._merge_vane_synthesis(
+                    deep_synthesis=deep_synthesis,
+                    direct_answer=direct_answer,
+                    summary=summary,
+                    mode=selected_mode,
+                )
+                logger.info(
+                    "event=vane_promoted request_id=%s mode=%s has_answer=%s has_summary=%s",
+                    request_id,
+                    selected_mode,
+                    bool(deep_synthesis.get("answer")),
+                    bool(deep_synthesis.get("summary") or deep_synthesis.get("message")),
+                )
 
         runtime = {
             "strict_runtime": req.strict_runtime,
             "provider_count": len(self.router.health_snapshot()),
             "vane_enabled": bool(self.config.vane.enabled),
+            "vane_timeout_s": deep_synthesis.get("timeout_s") if isinstance(deep_synthesis, dict) else None,
+            "vane_optimization_mode": deep_synthesis.get("optimization_mode") if isinstance(deep_synthesis, dict) else None,
         }
 
         diagnostics = SearchDiagnostics(
@@ -174,7 +190,15 @@ class ResearchOrchestrator:
                 "search": search_cache_state,
                 "page": self.page_cache.stats(),
             },
-            synthesis=evidence["diagnostics"],
+            synthesis={
+                **evidence["diagnostics"],
+                "vane": {
+                    "used": bool(deep_synthesis and not deep_synthesis.get("error")),
+                    "has_answer": bool(deep_synthesis.get("answer")) if isinstance(deep_synthesis, dict) else False,
+                    "has_summary": bool((deep_synthesis.get("summary") or deep_synthesis.get("message"))) if isinstance(deep_synthesis, dict) else False,
+                    "source_count": len(deep_synthesis.get("sources", [])) if isinstance(deep_synthesis, dict) else 0,
+                },
+            },
         )
 
         payload: Dict[str, Any] = {
@@ -1032,20 +1056,43 @@ class ResearchOrchestrator:
             return "medium"
         return "low"
 
+    def _merge_vane_synthesis(
+        self,
+        deep_synthesis: Dict[str, Any],
+        direct_answer: str,
+        summary: str,
+        mode: str,
+    ) -> tuple[str, str]:
+        vane_answer = (deep_synthesis.get("answer") or "").strip()
+        vane_summary = (deep_synthesis.get("summary") or deep_synthesis.get("message") or "").strip()
+
+        if vane_answer:
+            direct_answer = vane_answer
+        if vane_summary:
+            summary = vane_summary
+        elif vane_answer and mode == "research":
+            summary = vane_answer[:600].strip()
+
+        return direct_answer, summary
+
     def _select_vane_depth(self, query: str, requested_depth: str, mode: str) -> str:
         if requested_depth == "quick":
             return "quick"
         if requested_depth == "quality":
             return "quality"
 
-        profile = self.planner.classify_complexity(query)
-        if mode in {"deep", "research"} and (
-            profile.get("is_comparison")
-            or profile.get("is_recommendation")
-            or profile.get("is_specific")
-            or profile.get("is_long")
-        ):
-            return "quality"
+        if mode == "deep":
+            return "balanced"
+        if mode == "research":
+            profile = self.planner.classify_complexity(query)
+            if (
+                profile.get("is_comparison")
+                or profile.get("is_recommendation")
+                or profile.get("is_specific")
+                or profile.get("is_long")
+            ):
+                return "quality"
+            return "balanced"
 
         default_mode = self.config.vane.default_optimization_mode
         return default_mode if default_mode in {"speed", "balanced", "quality"} else "balanced"
