@@ -964,12 +964,16 @@ class ResearchOrchestrator:
         return f"{lead} {support}"
 
     def _build_direct_answer(self, query: str, findings: List[Dict[str, Any]], summary: str, mode: str) -> str:
-        if findings:
+        if not findings:
+            return summary
+        if mode == "deep" and len(findings) > 1:
+            lead = findings[0]["claim"]
+            support_points = "; ".join(item["claim"] for item in findings[1:])
+            return f"{lead} The evidence also indicates: {support_points}."
+        if mode == "research" and len(findings) > 1:
             answer = findings[0]["claim"]
-            if mode == "research" and len(findings) > 1:
-                return f"{answer} Key supporting points: {'; '.join(item['claim'] for item in findings[1:3])}."
-            return answer
-        return summary
+            return f"{answer} Key supporting points: {'; '.join(item['claim'] for item in findings[1:3])}."
+        return findings[0]["claim"]
 
     def _mode_profile(self, mode: str) -> Dict[str, str]:
         if mode == "research":
@@ -981,14 +985,24 @@ class ResearchOrchestrator:
     def _synthesize_claim(self, query: str, citations: List[Dict[str, Any]], mode: str) -> str:
         excerpts = [item.get("excerpt", "").strip() for item in citations if item.get("excerpt")]
         titles = [item.get("title", "").strip() for item in citations if item.get("title")]
-        lead_excerpt = self._summarize_text(excerpts[0]) if excerpts else ""
-        common_terms = self._common_terms(query, " ".join(excerpts + titles))
-        if not lead_excerpt:
+        if not excerpts:
             return self._summarize_text(titles[0]) if titles else ""
-        if mode == "research" and len(citations) > 1 and common_terms:
-            return f"{lead_excerpt} Across sources, the recurring focus is {', '.join(common_terms[:3])}."
-        if len(citations) > 1:
-            return f"{lead_excerpt} This is corroborated by {len(citations)} sources."
+
+        lead_excerpt = self._summarize_text(excerpts[0])
+        common_terms = self._common_terms(query, " ".join(excerpts + titles))
+
+        if len(citations) > 1 and common_terms:
+            theme = ", ".join(common_terms[:3])
+            corroboration_note = f"Corroborated across {len(citations)} sources, with recurring focus on {theme}."
+        elif len(citations) > 1:
+            corroboration_note = f"Corroborated by {len(citations)} independent sources."
+        else:
+            corroboration_note = ""
+
+        if mode == "research" and corroboration_note:
+            return f"{lead_excerpt} {corroboration_note}"
+        if corroboration_note:
+            return f"{lead_excerpt} {corroboration_note}"
         return lead_excerpt
 
     def _summarize_text(self, text: str) -> str:
