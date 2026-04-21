@@ -10,6 +10,7 @@ description: >
 requirements: pydantic
 """
 
+import asyncio
 import json
 import os
 import urllib.error
@@ -29,10 +30,10 @@ class Valves(BaseModel):
         description="Optional bearer token for the backend service",
     )
     REQUEST_TIMEOUT: int = Field(
-        default_factory=lambda: int(os.getenv("EWS_REQUEST_TIMEOUT", "25")),
+        default_factory=lambda: int(os.getenv("EWS_REQUEST_TIMEOUT", "60")),
         ge=3,
         le=120,
-        description="HTTP timeout in seconds",
+        description="HTTP timeout in seconds for backend requests",
     )
 
 
@@ -102,11 +103,55 @@ class Tools:
                 "details": body,
                 "service_url": url,
             }
+        except urllib.error.URLError as exc:
+            reason = getattr(exc, "reason", exc)
+            reason_text = str(reason)
+            if "timed out" in reason_text.lower():
+                return {
+                    "error": f"Service unavailable: backend request timed out after {self.valves.REQUEST_TIMEOUT}s",
+                    "service_url": url,
+                }
+            return {
+                "error": f"Service unavailable: {reason_text}",
+                "service_url": url,
+            }
+        except TimeoutError:
+            return {
+                "error": f"Service unavailable: backend request timed out after {self.valves.REQUEST_TIMEOUT}s",
+                "service_url": url,
+            }
         except Exception as exc:
             return {
                 "error": f"Service unavailable: {exc}",
                 "service_url": url,
             }
+
+    async def _post_json_with_progress(
+        self,
+        path: str,
+        payload: dict,
+        event_emitter: Optional[Any],
+        show_status: bool,
+        start_description: str,
+        progress_description: str,
+        done_description: str,
+    ) -> dict:
+        if show_status:
+            await self._emit_status(event_emitter, start_description)
+
+        task = asyncio.create_task(asyncio.to_thread(self._post_json, path, payload))
+        while not task.done():
+            await asyncio.sleep(10)
+            if task.done() or not show_status:
+                break
+            await self._emit_status(event_emitter, progress_description)
+
+        response = await task
+
+        if show_status:
+            await self._emit_status(event_emitter, done_description, done=True)
+
+        return response
 
     async def concise_search(
         self,
@@ -128,16 +173,6 @@ class Tools:
         if search_recency_amount < 1:
             search_recency_amount = 1
 
-        if show_status:
-            await self._emit_status(
-                __event_emitter__,
-                (
-                    "Calling concise search backend: "
-                    f"max_results={effective_max_results}, mode={search_mode}, "
-                    f"recency={search_recency_filter}, amount={search_recency_amount}"
-                ),
-            )
-
         payload = {
             "query": query,
             "max_results": effective_max_results,
@@ -147,10 +182,21 @@ class Tools:
             "search_recency_amount": search_recency_amount,
             "country": country,
         }
-        response = self._post_json("/search", payload)
 
-        if show_status:
-            await self._emit_status(__event_emitter__, "Concise search complete", done=True)
+        response = await self._post_json_with_progress(
+            "/search",
+            payload,
+            __event_emitter__,
+            show_status,
+            (
+                "Calling concise search backend: "
+                f"max_results={effective_max_results}, mode={search_mode}, "
+                f"recency={search_recency_filter}, amount={search_recency_amount}"
+            ),
+            "Concise search still working...",
+            "Concise search complete",
+        )
+
         return json.dumps(response, ensure_ascii=False)
 
     async def research_search(
@@ -167,9 +213,6 @@ class Tools:
         effective_iterations = max_iterations or self._get_user_valve(user_valves, "max_iterations", 4)
         show_status = self._get_user_valve(user_valves, "show_status_updates", True)
 
-        if show_status:
-            await self._emit_status(__event_emitter__, f"Calling long-form research backend: depth={depth}")
-
         payload = {
             "query": query,
             "source_mode": source_mode,
@@ -180,10 +223,17 @@ class Tools:
             "strict_runtime": False,
             "user_context": {},
         }
-        response = self._post_json("/research", payload)
 
-        if show_status:
-            await self._emit_status(__event_emitter__, "Long-form research complete", done=True)
+        response = await self._post_json_with_progress(
+            "/research",
+            payload,
+            __event_emitter__,
+            show_status,
+            f"Calling long-form research backend: depth={depth}",
+            "Long-form research still working...",
+            "Long-form research complete",
+        )
+
         return json.dumps(response, ensure_ascii=False)
 
     async def fetch_page(
@@ -194,9 +244,15 @@ class Tools:
     ) -> str:
         if __user__:
             _ = __user__
-        await self._emit_status(__event_emitter__, f"Fetching via backend: {url}")
-        response = self._post_json("/fetch", {"url": url})
-        await self._emit_status(__event_emitter__, "Fetch complete", done=True)
+        response = await self._post_json_with_progress(
+            "/fetch",
+            {"url": url},
+            __event_emitter__,
+            True,
+            f"Fetching via backend: {url}",
+            "Fetch still working...",
+            "Fetch complete",
+        )
         return json.dumps(response, ensure_ascii=False)
 
     async def extract_page_structure(
@@ -208,7 +264,13 @@ class Tools:
     ) -> str:
         if __user__:
             _ = __user__
-        await self._emit_status(__event_emitter__, f"Extracting via backend: {url}")
-        response = self._post_json("/extract", {"url": url, "components": components})
-        await self._emit_status(__event_emitter__, "Extraction complete", done=True)
+        response = await self._post_json_with_progress(
+            "/extract",
+            {"url": url, "components": components},
+            __event_emitter__,
+            True,
+            f"Extracting via backend: {url}",
+            "Extraction still working...",
+            "Extraction complete",
+        )
         return json.dumps(response, ensure_ascii=False)
