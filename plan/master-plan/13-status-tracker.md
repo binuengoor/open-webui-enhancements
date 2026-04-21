@@ -19,7 +19,7 @@ A milestone should only move to `done` after:
 | MP-01 Quick search hardening | done | complete | pass | merged to main; provider fallback/cooldown hardened, result budgeting added, empty-result cooldown regression fixed |
 | MP-02 Planning and routing foundation | done | complete | pass | merged to main; structured RoutingDecision and ResearchPlan schemas, planner hooks, diagnostics wiring, schema-level bounds enforced |
 | MP-03 Research synthesis refactor | done | complete | pass | merged to main; evidence/synthesis separation, clustered citation findings, mode-differentiated summary/direct_answer, corroboration fix, deep mode distinct behavior |
-| MP-04 Vane integration repair | todo | not started | not started | |
+| MP-04 Vane integration repair | done | complete | pass | merged to main; multi-path answer/summary/content extraction, Vane synthesis promotion, mode-based timeouts, content-path fix for all lookup paths |
 | MP-05 Progress streaming | todo | not started | not started | |
 | MP-06 Open WebUI wrapper repair | todo | not started | not started | |
 | MP-07 Provider expansion and hardening | todo | not started | not started | |
