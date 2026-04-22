@@ -172,12 +172,27 @@ async def research_search(
     )
 
 
+async def _handle_searxng_compat_search(
+    params: SearxngCompatRequest,
+    compat: SearxngCompatService,
+):
+    return (await compat.execute(params)).model_dump(exclude_none=True)
+
+
 @router.get("/compat/searxng")
 async def searxng_compat_search(
     params: SearxngCompatRequest = Depends(),
     compat: SearxngCompatService = Depends(get_searxng_compat_service),
 ):
-    return (await compat.execute(params)).model_dump(exclude_none=True)
+    return await _handle_searxng_compat_search(params, compat)
+
+
+@router.get("/compat/searxng/search")
+async def searxng_compat_search_vane(
+    params: SearxngCompatRequest = Depends(),
+    compat: SearxngCompatService = Depends(get_searxng_compat_service),
+):
+    return await _handle_searxng_compat_search(params, compat)
 
 
 @router.post("/research/export")
