@@ -577,6 +577,7 @@ class ResearchOrchestrator:
         max_attempts: int,
         request_id: str,
         limit_override: Any = None,
+        extra_options: Dict[str, Any] | None = None,
     ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], Dict[str, int]]:
         limit = self.config.modes[mode].max_pages_to_fetch
         if isinstance(limit_override, int) and limit_override > 0:
@@ -589,6 +590,8 @@ class ResearchOrchestrator:
             "request_id": request_id,
             "mode": mode,  # MP-07: propagate mode so router applies mode-aware provider preferences
         }
+        if extra_options:
+            options.update({key: value for key, value in extra_options.items() if value is not None})
 
         key = self._cache_key(query, mode, options)
         cached = self.search_cache.get(key)

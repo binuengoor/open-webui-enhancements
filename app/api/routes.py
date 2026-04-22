@@ -17,9 +17,11 @@ from app.models.contracts import (
     ResearchExportRequest,
     ResearchRequest,
     SearchRequest,
+    SearxngCompatRequest,
 )
 from app.services.orchestrator import ResearchOrchestrator
 from app.services.report_exporter import ReportExporter
+from app.services.searxng_compat import SearxngCompatService
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +46,14 @@ def get_router_health(request: Request):
 
 def get_report_exporter(request: Request) -> ReportExporter:
     return request.app.state.report_exporter
+
+
+def get_searxng_compat_service(request: Request) -> SearxngCompatService:
+    return SearxngCompatService(
+        config=request.app.state.config,
+        orchestrator=request.app.state.orchestrator,
+        router=request.app.state.provider_router,
+    )
 
 
 @router.post("/")
@@ -160,6 +170,14 @@ async def research_search(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
     )
+
+
+@router.get("/compat/searxng")
+async def searxng_compat_search(
+    params: SearxngCompatRequest = Depends(),
+    compat: SearxngCompatService = Depends(get_searxng_compat_service),
+):
+    return (await compat.execute(params)).model_dump(exclude_none=True)
 
 
 @router.post("/research/export")

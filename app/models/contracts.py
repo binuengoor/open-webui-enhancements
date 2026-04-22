@@ -127,6 +127,54 @@ class PerplexitySearchResponse(BaseModel):
     server_time: Optional[str] = None
 
 
+class SearxngCompatRequest(BaseModel):
+    q: str = Field(min_length=1)
+    format: str = "json"
+    categories: Optional[str] = None
+    engines: Optional[str] = None
+    language: Optional[str] = None
+    pageno: int = Field(default=1, ge=1)
+    time_range: Optional[str] = None
+
+    @field_validator("format")
+    @classmethod
+    def validate_format(cls, value: str) -> str:
+        if value != "json":
+            raise ValueError("unsupported format; only json is implemented")
+        return value
+
+    @property
+    def categories_list(self) -> List[str]:
+        return [item.strip().lower() for item in (self.categories or "").split(",") if item.strip()]
+
+    @property
+    def engines_list(self) -> List[str]:
+        return [item.strip().lower() for item in (self.engines or "").split(",") if item.strip()]
+
+
+class SearxngCompatResult(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    title: str = "Untitled"
+    url: str = ""
+    content: str = ""
+    engine: Optional[str] = None
+    img_src: Optional[str] = None
+    thumbnail: Optional[str] = None
+    iframe_src: Optional[str] = None
+
+
+class SearxngCompatResponse(BaseModel):
+    query: str
+    number_of_results: int = 0
+    results: List[SearxngCompatResult] = Field(default_factory=list)
+    answers: List[Any] = Field(default_factory=list)
+    corrections: List[Any] = Field(default_factory=list)
+    infoboxes: List[Any] = Field(default_factory=list)
+    suggestions: List[str] = Field(default_factory=list)
+    unresponsive_engines: List[Any] = Field(default_factory=list)
+
+
 class FetchRequest(BaseModel):
     url: HttpUrlString
 

@@ -199,6 +199,28 @@ Returns the canonical lightweight observability snapshot for the service, includ
 Returns a bounded newest-first recent-run history for debugging.
 Each entry includes endpoint, query, mode, success/failure, citation/source counts, confidence, and capped warnings/errors.
 
+### GET /compat/searxng
+
+Compatibility-only SearxNG-style endpoint for clients that expect `GET /search?format=json` semantics.
+
+Accepted query params include:
+
+- `q`
+- `format` (`json` only)
+- `categories`
+- `engines`
+- `language`
+- `pageno`
+- `time_range`
+
+Behavior notes:
+
+- General/web requests use the normal provider-rotating search path and return a SearxNG-like envelope.
+- Image/video requests are detected from `categories` and `engines` tokens such as `images`, `videos`, `youtube`, and `google images`.
+- Media requests currently pass through to the configured upstream SearxNG provider so media-specific fields like `img_src`, `thumbnail`, and `iframe_src` keep the expected shape.
+- Backend/provider failures degrade to HTTP 200 with an empty SearxNG-like payload.
+- This adapter is separate from the canonical `POST /search` and `POST /research` contracts.
+
 ### POST /research/export
 
 Exports a completed `/research` response as local artifacts without changing the normal response contract.
