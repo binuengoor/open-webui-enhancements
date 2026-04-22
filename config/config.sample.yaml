@@ -115,10 +115,10 @@ vane:
   embedding_model_key: Xenova/nomic-embed-text-v1
 
 compiler:
-  enabled: false
-  base_url: ${LITELLM_SEARCH_BASE_URL}
-  timeout_s: 20
-  model_id: ""
+  enabled: ${EWS_COMPILER_ENABLED}
+  base_url: ${EWS_COMPILER_BASE_URL}
+  timeout_s: ${EWS_COMPILER_TIMEOUT}
+  model_id: ${EWS_COMPILER_MODEL_ID}
 
 planner:
   llm_fallback_enabled: false
