@@ -13,6 +13,8 @@ class ServiceConfig(BaseModel):
     host: str = "0.0.0.0"
     port: int = 8091
     request_timeout_s: int = 25
+    auto_export_research: bool = False
+    report_output_dir: str = "artifacts/reports"
 
 
 class ModeBudget(BaseModel):

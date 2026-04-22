@@ -10,6 +10,7 @@ services:
       - "8091:8091"
     volumes:
       - ./config/config.yaml:/app/config/config.yaml:ro
+      - ./artifacts/reports:/app/artifacts/reports
     restart: unless-stopped
 
 

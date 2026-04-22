@@ -97,6 +97,10 @@ def _build_orchestrator(config: AppConfig, router: ProviderRouter) -> ResearchOr
         model_id=config.compiler.model_id,
     )
 
+    report_dir = Path(config.service.report_output_dir)
+    if not report_dir.is_absolute():
+        report_dir = Path(__file__).resolve().parents[1] / report_dir
+
     return ResearchOrchestrator(
         config=config,
         router=router,
@@ -108,6 +112,8 @@ def _build_orchestrator(config: AppConfig, router: ProviderRouter) -> ResearchOr
         vane=vane,
         compiler=compiler,
         run_history=RecentRunHistory(max_entries=100),
+        report_exporter=ReportExporter(report_dir),
+        auto_export_research=config.service.auto_export_research,
     )
 
 
@@ -120,7 +126,7 @@ async def lifespan(app: FastAPI):
     orchestrator = _build_orchestrator(config, router)
 
     container.config = config
-    report_exporter = ReportExporter(Path(__file__).resolve().parents[1] / "artifacts" / "reports")
+    report_exporter = orchestrator.report_exporter
 
     container.provider_router = router
     container.orchestrator = orchestrator

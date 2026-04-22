@@ -24,6 +24,7 @@ from app.services.ranking import Ranker
 from app.services.compiler import ResultCompiler
 from app.services.vane import VaneClient
 from app.services.run_history import RecentRunHistory
+from app.services.report_exporter import ReportExporter
 
 
 logger = logging.getLogger(__name__)
@@ -44,6 +45,8 @@ class ResearchOrchestrator:
         vane: VaneClient,
         compiler: ResultCompiler,
         run_history: RecentRunHistory | None = None,
+        report_exporter: ReportExporter | None = None,
+        auto_export_research: bool = False,
     ):
         self.config = config
         self.router = router
@@ -55,6 +58,8 @@ class ResearchOrchestrator:
         self.vane = vane
         self.compiler = compiler
         self.run_history = run_history or RecentRunHistory()
+        self.report_exporter = report_exporter
+        self.auto_export_research = auto_export_research
 
     async def execute_search(
         self,
@@ -313,6 +318,11 @@ class ResearchOrchestrator:
             warnings=warnings,
             errors=errors,
         )
+        if self.auto_export_research and endpoint == "/research" and self.report_exporter is not None:
+            try:
+                self.report_exporter.export_research_report(response)
+            except Exception as exc:
+                logger.warning("event=report_auto_export_failed request_id=%s query=%r error=%s", request_id, req.query, exc)
         return response
 
     async def execute_perplexity_search(self, req: PerplexitySearchRequest) -> PerplexitySearchResponse:

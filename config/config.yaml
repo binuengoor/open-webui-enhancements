@@ -1,6 +1,8 @@
 service:
   host: 0.0.0.0
   port: 8091
+  auto_export_research: true
+  report_output_dir: artifacts/reports
   request_timeout_s: 25
 
 routing:
