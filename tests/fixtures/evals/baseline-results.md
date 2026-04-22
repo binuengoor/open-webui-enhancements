@@ -8,6 +8,8 @@ Branch: `main`
 
 Blocked. No live `enhanced-websearch` container was running, and nothing was listening on port `8091`, so the requested live `/search` and `/research` benchmark run could not be executed.
 
+Machine-readable companion: `tests/fixtures/evals/baseline-results.json`
+
 ## Checks Performed
 
 - Reviewed:

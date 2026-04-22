@@ -1,0 +1,92 @@
+{
+  "artifact_version": 1,
+  "milestone": "MP-08",
+  "artifact_type": "live_eval_baseline_attempt",
+  "date": "2026-04-22",
+  "repo": "/home/millionmax/git/enhanced-websearch",
+  "branch": "main",
+  "outcome": {
+    "status": "blocked",
+    "reason": "No live enhanced-websearch container was running, and nothing was listening on port 8091, so the requested live benchmark run could not be executed.",
+    "baseline_acceptable": false
+  },
+  "checks_performed": [
+    "Reviewed plan/master-plan/30-mp-08-quality-gates-test-plan.md",
+    "Reviewed tests/test_evals.py",
+    "Reviewed tests/eval_gates.py",
+    "Reviewed tests/fixtures/evals/",
+    "Checked Docker containers with docker ps and docker ps -a",
+    "Searched for any container exposing 8091",
+    "Checked for any container named enhanced-websearch",
+    "Confirmed Dockerfile and docker-compose.yml expect service/container enhanced-websearch on port 8091",
+    "Tried curl http://127.0.0.1:8091/health from the host; connection failed"
+  ],
+  "docker_findings": {
+    "running_container_named_enhanced_websearch": false,
+    "stopped_container_named_enhanced_websearch": false,
+    "port_8091_exposed": false,
+    "compose_cli_available": false,
+    "notes": [
+      "docker ps showed multiple running containers, but none named enhanced-websearch",
+      "No running or stopped container matched enhanced-websearch",
+      "No container exposed 8091",
+      "docker compose and docker-compose CLIs were not available in this environment, so the stack was not started"
+    ]
+  },
+  "planned_fixture_set": [
+    {
+      "path": "tests/fixtures/evals/factual_python_release_date.json",
+      "category": "factual lookup",
+      "endpoint": "/search"
+    },
+    {
+      "path": "tests/fixtures/evals/comparison_postgres_mysql_analytics.json",
+      "category": "comparison",
+      "endpoint": "/research"
+    },
+    {
+      "path": "tests/fixtures/evals/howto_fix_docker_permission_denied.json",
+      "category": "technical how-to",
+      "endpoint": "/research"
+    },
+    {
+      "path": "tests/fixtures/evals/broad_explainer_http2_http3.json",
+      "category": "broad explainer",
+      "endpoint": "/research"
+    },
+    {
+      "path": "tests/fixtures/evals/contradiction_remote_work_productivity.json",
+      "category": "contradiction-heavy",
+      "endpoint": "/research"
+    },
+    {
+      "path": "tests/fixtures/evals/recency_python_release_research.json",
+      "category": "recency-sensitive",
+      "endpoint": "/research"
+    },
+    {
+      "path": "tests/fixtures/evals/sparse_evidence_local_rag_regulated_docs.json",
+      "category": "sparse-evidence",
+      "endpoint": "/research"
+    }
+  ],
+  "intended_gate_sequence": [
+    "generic_answer",
+    "thin_answer",
+    "grounding_citation",
+    "contradiction_handling",
+    "unsupported_certainty",
+    "regression_baseline"
+  ],
+  "captured_live_results": {
+    "count": 0,
+    "scored": false,
+    "notes": [
+      "No live responses were captured, so there are no pass/fail scores yet"
+    ]
+  },
+  "unblock_requirements": [
+    "A container named enhanced-websearch is running and serving on port 8091",
+    "Or an equivalent running container is identified and reachable for docker exec plus local POSTs to /search and /research"
+  ]
+}

@@ -9,20 +9,36 @@ _MIN_CITATIONS = 3
 _MIN_SOURCES = 3
 _MIN_FINDINGS = 2
 
-# Known limitation (tracked in MP-08 review):
-# These thresholds are unconditionally strict for all response shapes.
-# The plan allows sparse-evidence cases with 2 citations and says /search
-# checks may be lighter, but this helper enforces >=3 for everything.
-# This can force acceptable sparse/uncertain research into fallback, and
-# misclassify concise /search-style outputs as unusable.
-# Fix: make _MIN_CITATIONS and _MIN_SOURCES configurable per mode/scenario
-# via an optional override dict when this becomes a production bottleneck.
+# Keep the default vetting strict, but allow narrow lower-evidence cases that
+# still carry enough grounded structure to avoid unnecessary fallback.
+_RELAXED_MIN_CITATIONS = 2
+_RELAXED_MIN_SOURCES = 2
 
 
 def _payload_dict(payload: SearchResponse | Mapping[str, Any] | dict[str, Any]) -> dict[str, Any]:
     if isinstance(payload, SearchResponse):
         return payload.model_dump()
     return dict(payload)
+
+
+def _is_relaxed_but_grounded(data: dict[str, Any], citations: list[Any], sources: list[Any], findings: list[Any]) -> bool:
+    mode = str(data.get("mode", "")).strip().lower()
+    confidence = str(data.get("confidence", "")).strip().lower()
+    summary = str(data.get("summary", "")).strip()
+    direct_answer = str(data.get("direct_answer", "")).strip()
+
+    if len(citations) < _RELAXED_MIN_CITATIONS or len(sources) < _RELAXED_MIN_SOURCES:
+        return False
+
+    if mode == "fast":
+        return len(findings) >= 1 and len(summary) >= 80 and len(direct_answer) >= 24 and confidence in {"medium", "high"}
+
+    return (
+        len(findings) >= _MIN_FINDINGS
+        and confidence == "medium"
+        and len(summary) >= 120
+        and len(direct_answer) >= 40
+    )
 
 
 def looks_useful_search_response(payload: SearchResponse | Mapping[str, Any] | dict[str, Any]) -> bool:
@@ -38,10 +54,10 @@ def looks_useful_search_response(payload: SearchResponse | Mapping[str, Any] | d
 
     if errors:
         return False
-    if len(citations) < _MIN_CITATIONS or len(sources) < _MIN_SOURCES or len(findings) < _MIN_FINDINGS:
-        return False
     if not direct_answer or not summary:
         return False
     if confidence == "low":
         return False
-    return True
+    if len(citations) >= _MIN_CITATIONS and len(sources) >= _MIN_SOURCES and len(findings) >= _MIN_FINDINGS:
+        return True
+    return _is_relaxed_but_grounded(data, citations, sources, findings)

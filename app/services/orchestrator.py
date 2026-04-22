@@ -481,6 +481,7 @@ class ResearchOrchestrator:
             "source_mode": source_mode,
             "depth": depth,
             "request_id": request_id,
+            "mode": mode,  # MP-07: propagate mode so router applies mode-aware provider preferences
         }
 
         key = self._cache_key(query, mode, options)
