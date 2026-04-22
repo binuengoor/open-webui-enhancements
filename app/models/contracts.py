@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Annotated, Any, Dict, List, Literal, Optional, Union
 from urllib.parse import urlparse
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator
 
 
 Mode = Literal["auto", "fast", "deep", "research", "fast_fallback"]
@@ -86,13 +86,23 @@ class PerplexitySearchRequest(BaseModel):
     search_before_date_filter: Optional[str] = None
     last_updated_after_filter: Optional[str] = None
     last_updated_before_filter: Optional[str] = None
-    search_mode: Optional[Literal["web", "academic", "sec"]] = None
+    search_mode: Optional[Literal["auto", "web", "academic", "sec"]] = Field(
+        default=None,
+        description="Search surface selector. `auto` is equivalent to omitting the field and uses the default web search behavior.",
+    )
     mode: Optional[Mode] = Field(
         default=None,
         description="Deprecated. Endpoint selection should determine behavior: /search for concise results, /research for long-form output.",
     )
     client: Optional[str] = None
     trace_id: Optional[str] = None
+
+    @field_validator("search_mode", mode="before")
+    @classmethod
+    def normalize_auto_search_mode(cls, value: Optional[str]) -> Optional[str]:
+        if value == "auto":
+            return None
+        return value
 
 
 class PerplexitySearchResult(BaseModel):

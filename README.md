@@ -88,6 +88,7 @@ Optional Perplexity-style extensions are also accepted, including:
 Behavior notes:
 
 - `/search` always executes in a fast profile with lightweight heuristic planning.
+- `search_mode: "auto"` is accepted and behaves the same as omitting `search_mode` entirely.
 - Use `/research` for long-form output.
 
 The endpoint also enforces:
@@ -226,7 +227,7 @@ Available tools:
 
 Tool guidance:
 
-- `search` is the concise search path with only the few useful knobs kept (`max_results`, `display_server_time`, `search_mode`, `search_recency_filter`, `search_recency_amount`, `country`). `search_mode` accepts `auto`, `web`, `academic`, or `sec`; `search_recency_filter` accepts `none`, `hour`, `day`, `week`, `month`, or `year`; `search_recency_amount` (default `1`) lets you request multi-unit windows such as `3` + `month`.
+- `search` is the concise search path with only the few useful knobs kept (`max_results`, `display_server_time`, `search_mode`, `search_recency_filter`, `search_recency_amount`, `country`). `search_mode` accepts `auto`, `web`, `academic`, or `sec`; `auto` is normalized to the default behavior and sent to the backend the same as omitting the field; `search_recency_filter` accepts `none`, `hour`, `day`, `week`, `month`, or `year`; `search_recency_amount` (default `1`) lets you request multi-unit windows such as `3` + `month`.
 - `research` is the explicit long-form research path with only the needed research knobs (`source_mode`, `depth`, `max_iterations`, `include_legacy`, `strict_runtime`, `include_debug`). `source_mode` accepts `web`, `academia`, `social`, or `all`; `depth` currently accepts `quick`, `balanced`, or `quality`, but `quick` should be treated as compatibility-only rather than the intended long-term public contract.
 - `fetch_page` and `extract_page_structure` are for page-level inspection and debugging.
 - `health_check`, `providers_health`, and `service_metrics` are for operational checks. Prefer `service_metrics` for the single aggregated view.
@@ -438,7 +439,7 @@ Escalation:
 - In `research_search`, escalate depth only as needed. Prefer `balanced` first; use `quick` only when maintaining compatibility with older clients/prompts; escalate to `quality` for clearly harder requests.
 
 `concise_search` knobs:
-- `search_mode`: `auto|web|academic|sec`
+- `search_mode`: `auto|web|academic|sec` (`auto` = default behavior, equivalent to omitting it)
 - `search_recency_filter`: `none|hour|day|week|month|year`
 - `search_recency_amount`: integer (for example `3` + `month`)
 - `country`, `max_results`
