@@ -14,7 +14,7 @@ This service is the canonical research engine. It owns:
 - optional Vane deep synthesis
 - evidence/citation assembly
 - structured response construction
-- diagnostics, provider traces, and cache reporting
+- diagnostics, provider traces, cache reporting, recent-run history, and research report export
 - MCP tools mounted on the same ASGI app at `/mcp`
 
 The Open WebUI workspace tool becomes a thin HTTP wrapper.
@@ -185,7 +185,29 @@ Returns effective non-secret config for debugging.
 
 ### GET /metrics
 
-Returns basic service metrics (cache size and provider count) for lightweight observability.
+Returns the canonical lightweight observability snapshot for the service, including:
+
+- search cache stats
+- page cache stats
+- provider summary (`healthy`, `cooldown`, `degraded`)
+- recent request summary (`total`, `success`, `failed`)
+
+### GET /runs/recent
+
+Returns a bounded newest-first recent-run history for debugging.
+Each entry includes endpoint, query, mode, success/failure, citation/source counts, confidence, and capped warnings/errors.
+
+### POST /research/export
+
+Exports a completed `/research` response as local artifacts without changing the normal response contract.
+Artifacts are written as:
+
+- `report.md`
+- `report.yaml`
+
+under `artifacts/reports/<timestamp-slug-random>/`.
+
+If `service.auto_export_research: true` is enabled, completed `/research` requests are exported automatically after successful completion.
 
 ### MCP tools at /mcp
 
@@ -199,13 +221,14 @@ Available tools:
 - extract_page_structure
 - health_check
 - providers_health
+- service_metrics
 
 Tool guidance:
 
 - `search` is the concise search path with only the few useful knobs kept (`max_results`, `display_server_time`, `search_mode`, `search_recency_filter`, `search_recency_amount`, `country`). `search_mode` accepts `auto`, `web`, `academic`, or `sec`; `search_recency_filter` accepts `none`, `hour`, `day`, `week`, `month`, or `year`; `search_recency_amount` (default `1`) lets you request multi-unit windows such as `3` + `month`.
 - `research` is the explicit long-form research path with only the needed research knobs (`source_mode`, `depth`, `max_iterations`, `include_legacy`, `strict_runtime`, `include_debug`). `source_mode` accepts `web`, `academia`, `social`, or `all`; `depth` currently accepts `quick`, `balanced`, or `quality`, but `quick` should be treated as compatibility-only rather than the intended long-term public contract.
 - `fetch_page` and `extract_page_structure` are for page-level inspection and debugging.
-- `health_check` and `providers_health` are for operational checks.
+- `health_check`, `providers_health`, and `service_metrics` are for operational checks. Prefer `service_metrics` for the single aggregated view.
 
 Optional bearer token:
 
