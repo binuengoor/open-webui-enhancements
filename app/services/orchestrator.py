@@ -394,7 +394,14 @@ class ResearchOrchestrator:
             )
             response = await self.execute_search(internal)
             items = self._perplexity_results_from_response(response)
+            if not items:
+                # Empty /search items mean upstream retrieval failed or all candidates were filtered out.
+                # Return a clear client-visible error instead of a misleading success-with-zero-results.
+                details = "; ".join(response.diagnostics.errors or []) or "no usable upstream results"
+                raise ValueError(f"search upstream failure: {details}")
             items = self._apply_perplexity_filters(items, req)
+            if not items:
+                raise ValueError("search upstream failure: all candidate results were filtered out")
 
             compiler_input = []
             for idx, item in enumerate(items, start=1):
