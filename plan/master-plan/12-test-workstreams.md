@@ -136,16 +136,17 @@ It is complete when the relevant test conditions pass.
 ## MP-09 - Optional product enhancements
 
 ### Test scenarios
-- export a completed research response into the chosen saved-report artifact formats
-- inspect recent-run history with and without optional file-backed persistence enabled
-- verify diagnostics/admin surface during normal operation and after a handled provider failure
-- restart the service with no optional persistence configured and confirm core search/research behavior is unchanged
+- export a completed research response as Markdown and YAML and verify both remain readable and complete
+- inspect recent-run history with and without optional local file backing enabled
+- verify the enhanced `/metrics` endpoint during normal operation and after a handled provider failure
+- verify MCP returns the same core metrics/health information rather than a divergent duplicate surface
+- restart the service with no optional history/report writing configured and confirm core search/research behavior is unchanged
 
 ### Validate
-- saved-report artifacts match completed response data and do not require a database lookup path
+- saved-report artifacts match completed response data and are useful to a human without a database lookup path
 - recent-run history remains bounded, understandable, and non-essential to request execution
-- diagnostics expose useful operational facts without leaking unstable internal implementation details
-- optional persistence remains local-first, file-based, and safe to disable
+- `/metrics` becomes the canonical diagnostics surface without spawning overlapping endpoints
+- MCP mirrors the same data model rather than inventing a second interpretation
 - MP-09 changes do not regress latency, reliability, or the thin-client architecture
 
 ## Suggested benchmark buckets

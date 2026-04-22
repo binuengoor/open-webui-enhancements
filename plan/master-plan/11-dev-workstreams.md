@@ -182,20 +182,22 @@ This file translates backlog items into development-focused work packages suitab
 ## MP-09 - Optional product enhancements
 
 ### Dev tasks
-- define a simple saved-report export path for completed research results using existing response artifacts
-- add a minimal recent-run history surface backed by local files or ephemeral state rather than a service database
-- expose a tiny diagnostics surface for config/runtime health and recent request counters useful during manual validation
-- add persistence only if required for the above, keeping it file-based and optional
+- define a simple saved-report export path for completed research results using existing response artifacts, preferring Markdown and YAML outputs for human readability
+- add a minimal recent-run history log backed by local files or ephemeral state rather than a service database
+- enhance the existing `/metrics` endpoint so it can expose provider health, cache stats, and recent request counters in one place
+- mirror the same metrics/health data through MCP rather than adding a separate overlapping status surface
 - document explicit anti-scope so polish work does not sprawl into a platform project
 
 ### Likely files
 - `app/api/routes.py`
 - `app/services/orchestrator.py`
 - `app/models/contracts.py`
+- `app/mcp_server.py`
 - small docs under `plan/master-plan/*`
-- optional local artifact helpers if needed
+- local artifact/history helpers if needed
 
 ### Risks
 - polishing the wrong layer before the backend is trustworthy
 - accidentally introducing durable state assumptions into a local-first backend
-- letting diagnostics grow into an analytics/dashboard subsystem
+- letting `/metrics` sprawl into a dashboard/analytics subsystem
+- duplicating health/metrics surfaces instead of enhancing one canonical API + MCP path

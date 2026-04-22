@@ -214,16 +214,16 @@ Add structured evaluation and failure detection.
 Add a small amount of operator and usability polish only after the core is stable.
 
 **Includes:**
-- saved-report export from completed research responses as file artifacts (for example JSON and Markdown) without introducing a report database
-- a minimal run-history view based on local files or in-memory state for recent requests, focused on debugging and manual inspection rather than analytics
-- lightweight diagnostics/admin endpoints or views that expose current config/runtime health and recent milestone-relevant counters without adding a dashboard system
-- optional persistence limited to small local-first artifacts that clearly support the two items above, only if in-memory state proves insufficient
+- saved-report export from completed research responses as Markdown and YAML artifacts without introducing a report database
+- a minimal run-history log for recent requests, focused on debugging and manual inspection rather than analytics
+- enhancements to the single `/metrics` endpoint so it can expose provider health, cache stats, and recent request counters in one place; mirror the same data through MCP rather than adding parallel status surfaces
 
 **Explicit anti-scope:**
 - no job queue or durable orchestration system
-- no mandatory database or cross-request state store by default
+- no mandatory database or cross-request state store
 - no heavy analytics pipeline, dashboard product, or multi-user admin surface
 - no changes that make the wrapper or frontend own backend logic
+- no optional persistence layer beyond file-based report artifacts and lightweight run-history state
 
 **Dependencies:** MP-08
 
