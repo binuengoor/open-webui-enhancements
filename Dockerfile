@@ -12,7 +12,8 @@ RUN pip install --no-cache-dir --no-compile -r /app/requirements.txt
 COPY app /app/app
 COPY config/config.yaml /app/config/config.yaml
 
-RUN groupadd --gid 1000 app \
+RUN mkdir -p /app/artifacts/reports \
+	&& groupadd --gid 1000 app \
 	&& useradd --uid 1000 --gid 1000 --create-home --home-dir /home/app --shell /usr/sbin/nologin app \
 	&& chown -R app:app /app
 
