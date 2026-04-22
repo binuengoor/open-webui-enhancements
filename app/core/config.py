@@ -102,6 +102,20 @@ class AppConfig(BaseModel):
     planner: PlannerConfig = Field(default_factory=PlannerConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
 
+    @property
+    def research_llm_ready(self) -> bool:
+        compiler_ready = bool(self.compiler.enabled and self.compiler.base_url and self.compiler.model_id)
+        vane_ready = bool(self.vane.enabled and self.vane.url)
+        return compiler_ready or vane_ready
+
+    @property
+    def research_llm_requirement_error(self) -> str:
+        return (
+            "research mode requires LLM support; enable Vane or configure the compiler "
+            "(set `VANE_ENABLED=true` with `VANE_URL`, or `EWS_COMPILER_ENABLED=true` with "
+            "`EWS_COMPILER_BASE_URL` and `EWS_COMPILER_MODEL_ID`)"
+        )
+
     @model_validator(mode="after")
     def validate_provider_preferences(self) -> "AppConfig":
         known_provider_names = {provider.name for provider in self.providers}

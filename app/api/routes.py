@@ -87,6 +87,12 @@ async def research_search(
     request: Request,
     orch: ResearchOrchestrator = Depends(get_orchestrator),
 ):
+    # `/research` is the explicitly LLM-backed long-form path.
+    try:
+        orch.ensure_research_llm_available()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     internal_request = SearchRequest(
         query=payload.query,
         mode="research",

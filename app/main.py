@@ -162,6 +162,13 @@ async def lifespan(app: FastAPI):
         config.vane.chat_model_key,
         config.vane.embedding_model_key,
     )
+    logger.info(
+        "startup research_llm_ready=%s compiler_enabled=%s compiler_base_url=%s compiler_model_id_set=%s",
+        config.research_llm_ready,
+        config.compiler.enabled,
+        config.compiler.base_url or "none",
+        bool(config.compiler.model_id),
+    )
 
     logger.info("Enhanced websearch service started")
     async with mcp_app.router.lifespan_context(mcp_app):

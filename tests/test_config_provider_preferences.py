@@ -81,6 +81,68 @@ class ProviderPreferencesConfigTests(unittest.TestCase):
         self.assertEqual(config.providers[0].path, "/search/brave-search")
         self.assertEqual(config.providers[0].api_key_env, "LITELLM_API_KEY")
 
+    def test_research_llm_ready_when_compiler_is_configured(self):
+        path = self._write_config(
+            """
+            modes:
+              fast:
+                max_provider_attempts: 1
+                max_queries: 1
+                max_pages_to_fetch: 1
+            providers:
+              - name: searxng
+                kind: searxng
+            compiler:
+              enabled: true
+              base_url: http://litellm.local/v1
+              model_id: gpt-4o-mini
+            """
+        )
+
+        config = load_config(path)
+
+        self.assertTrue(config.research_llm_ready)
+
+    def test_research_llm_ready_when_vane_is_configured(self):
+        path = self._write_config(
+            """
+            modes:
+              fast:
+                max_provider_attempts: 1
+                max_queries: 1
+                max_pages_to_fetch: 1
+            providers:
+              - name: searxng
+                kind: searxng
+            vane:
+              enabled: true
+              url: http://vane.local
+            """
+        )
+
+        config = load_config(path)
+
+        self.assertTrue(config.research_llm_ready)
+
+    def test_research_llm_not_ready_without_vane_or_compiler(self):
+        path = self._write_config(
+            """
+            modes:
+              fast:
+                max_provider_attempts: 1
+                max_queries: 1
+                max_pages_to_fetch: 1
+            providers:
+              - name: searxng
+                kind: searxng
+            """
+        )
+
+        config = load_config(path)
+
+        self.assertFalse(config.research_llm_ready)
+        self.assertIn("research mode requires LLM support", config.research_llm_requirement_error)
+
 
 if __name__ == "__main__":
     unittest.main()

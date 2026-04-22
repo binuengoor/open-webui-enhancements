@@ -61,12 +61,19 @@ class ResearchOrchestrator:
         self.report_exporter = report_exporter
         self.auto_export_research = auto_export_research
 
+    def ensure_research_llm_available(self) -> None:
+        if not self.config.research_llm_ready:
+            raise ValueError(self.config.research_llm_requirement_error)
+
     async def execute_search(
         self,
         req: SearchRequest,
         progress_callback: ProgressCallback | None = None,
         endpoint: str = "/research",
     ) -> SearchResponse:
+        if endpoint == "/research" or req.mode in {"research", "deep"}:
+            self.ensure_research_llm_available()
+
         request_id = uuid.uuid4().hex[:8]
         started = time.perf_counter()
         routing_decision = RoutingDecision.model_validate(self.planner.build_route_decision(req.mode, req.query))

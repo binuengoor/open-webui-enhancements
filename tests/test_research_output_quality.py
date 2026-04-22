@@ -62,6 +62,8 @@ class ResearchOutputQualityTests(unittest.TestCase):
             vane=SimpleNamespace(enabled=False, default_optimization_mode="balanced"),
             planner=SimpleNamespace(llm_fallback_enabled=False),
             cache=SimpleNamespace(ttl_general_s=300, ttl_recency_s=45, page_cache_ttl_s=120),
+            research_llm_ready=False,
+            research_llm_requirement_error="research mode requires LLM support",
         )
         self.orchestrator = self._make_orchestrator()
 
@@ -77,6 +79,15 @@ class ResearchOutputQualityTests(unittest.TestCase):
             vane=_StubVane(vane_response),
             compiler=compiler or _StubCompiler(),
         )
+
+    def test_ensure_research_llm_available_rejects_missing_llm(self):
+        with self.assertRaisesRegex(ValueError, "research mode requires LLM support"):
+            self.orchestrator.ensure_research_llm_available()
+
+    def test_ensure_research_llm_available_accepts_when_ready(self):
+        self.config.research_llm_ready = True
+
+        self.orchestrator.ensure_research_llm_available()
 
     def test_best_excerpt_skips_boilerplate_and_fragment_lines(self):
         content = """Context.

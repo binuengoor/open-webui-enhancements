@@ -102,6 +102,7 @@ Unknown fields are ignored.
 ### POST /research
 
 Long-form research endpoint for multi-step synthesis with citations and diagnostics.
+This endpoint now requires LLM support at runtime; it returns HTTP 400 instead of silently degrading when neither Vane nor the compiler is configured.
 
 Request body:
 
@@ -301,7 +302,7 @@ LiteLLM gateway setup defaults:
   - `EWS_PROVIDER_LINKUP_ENABLED=true|false`
 - when a flag is unset, YAML `providers[].enabled` is used
 
-Optional LLM result compiler (Perplexity `/search` response refinement):
+Optional LLM result compiler (Perplexity `/search` response refinement and one valid `/research` LLM backend):
 
 - set `EWS_COMPILER_ENABLED=true` to enable
 - set `EWS_COMPILER_MODEL_ID` to the LiteLLM chat model id to use
@@ -309,6 +310,7 @@ Optional LLM result compiler (Perplexity `/search` response refinement):
 - set `EWS_COMPILER_API_KEY` for a compiler-specific auth key
 - if `EWS_COMPILER_API_KEY` is unset, compiler falls back to `LITELLM_API_KEY`
 - the same compiler is also used as a final research quality gate; if a long-form `research` response looks thin or generic, the service can fall back to a quick grounded search path before returning
+- `/research` requires at least one configured LLM path: either Vane (`VANE_ENABLED=true` plus `VANE_URL`) or the compiler (`EWS_COMPILER_ENABLED=true` plus `EWS_COMPILER_BASE_URL` and `EWS_COMPILER_MODEL_ID`)
 
 Optional LLM planner fallback (`/search` profile selection):
 
@@ -326,6 +328,7 @@ When compiler output is accepted, each result may also include optional groundin
 Vane defaults:
 
 - VANE_ENABLED controls whether deep/research flows can call Vane
+- if Vane is disabled, `/research` can still run only when the compiler is configured; `/search` remains available without either LLM path
 - VANE_DEFAULT_MODE defaults to balanced and can be set to speed, balanced, or quality
 - deep/research requests can still escalate to quality when the query warrants it
 
