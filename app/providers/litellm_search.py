@@ -7,7 +7,14 @@ from typing import Any, Dict, List
 
 import httpx
 
-from app.providers.base import ProviderError, RateLimitError, SearchProvider
+from app.providers.base import (
+    AuthProviderError,
+    ProviderError,
+    RateLimitError,
+    SearchProvider,
+    TransientProviderError,
+    UpstreamProviderError,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -49,6 +56,24 @@ class LiteLLMSearchProvider(SearchProvider):
         try:
             async with httpx.AsyncClient(timeout=self.timeout_s) as client:
                 resp = await client.post(url, json=payload, headers=headers)
+        except httpx.TimeoutException as exc:
+            logger.warning(
+                "event=provider_http_exception request_id=%s provider=%s error_type=%s error=%r",
+                request_id,
+                self.name,
+                type(exc).__name__,
+                exc,
+            )
+            raise TransientProviderError(f"{self.name} request timed out") from exc
+        except httpx.NetworkError as exc:
+            logger.warning(
+                "event=provider_http_exception request_id=%s provider=%s error_type=%s error=%r",
+                request_id,
+                self.name,
+                type(exc).__name__,
+                exc,
+            )
+            raise TransientProviderError(f"{self.name} network error: {type(exc).__name__}") from exc
         except httpx.HTTPError as exc:
             logger.warning(
                 "event=provider_http_exception request_id=%s provider=%s error_type=%s error=%r",
@@ -61,7 +86,18 @@ class LiteLLMSearchProvider(SearchProvider):
 
         if resp.status_code == 429:
             logger.warning("event=provider_http_error request_id=%s provider=%s status=429 query=%r", request_id, self.name, query)
-            raise RateLimitError(f"{self.name} rate limited")
+            retry_after = resp.headers.get("retry-after", "").strip()
+            cooldown_seconds = int(retry_after) if retry_after.isdigit() else None
+            raise RateLimitError(f"{self.name} rate limited", cooldown_seconds=cooldown_seconds)
+        if resp.status_code in {401, 403}:
+            logger.warning("event=provider_http_error request_id=%s provider=%s status=%s query=%r", request_id, self.name, resp.status_code, query)
+            raise AuthProviderError(f"{self.name} auth failed with HTTP {resp.status_code}")
+        if resp.status_code in {502, 503, 504}:
+            logger.warning("event=provider_http_error request_id=%s provider=%s status=%s query=%r", request_id, self.name, resp.status_code, query)
+            raise UpstreamProviderError(f"{self.name} upstream HTTP {resp.status_code}")
+        if resp.status_code >= 500:
+            logger.warning("event=provider_http_error request_id=%s provider=%s status=%s query=%r", request_id, self.name, resp.status_code, query)
+            raise UpstreamProviderError(f"{self.name} HTTP {resp.status_code}")
         if resp.status_code >= 400:
             logger.warning("event=provider_http_error request_id=%s provider=%s status=%s query=%r", request_id, self.name, resp.status_code, query)
             raise ProviderError(f"{self.name} HTTP {resp.status_code}")

@@ -7,7 +7,7 @@ from threading import Lock
 from typing import Any, Dict, List, Tuple
 
 from app.models.contracts import ProviderHealthRecord
-from app.providers.base import ProviderError, RateLimitError, SearchProvider
+from app.providers.base import ProviderError, SearchProvider
 
 
 logger = logging.getLogger(__name__)
@@ -73,16 +73,33 @@ class ProviderRouter:
     def _mark_success(self, name: str) -> None:
         rec = self._health[name]
         rec.consecutive_failures = 0
+        rec.consecutive_empty_results = 0
         rec.last_success_at = time.time()
         rec.last_failure_reason = ""
+        rec.last_failure_type = ""
+        rec.last_cooldown_seconds = 0
+        rec.cooldown_until = 0.0
 
-    def _mark_failure(self, name: str, reason: str, rate_limited: bool = False) -> None:
+    def _cooldown_seconds_for(self, exc: ProviderError) -> int:
+        if exc.cooldown_seconds is not None:
+            return max(1, int(exc.cooldown_seconds))
+        return max(1, int(self._cooldown_seconds * getattr(exc, "cooldown_multiplier", 1.0)))
+
+    def _mark_failure(self, name: str, exc: ProviderError) -> int:
         rec = self._health[name]
         rec.consecutive_failures += 1
         rec.last_failure_at = time.time()
-        rec.last_failure_reason = reason
-        if rate_limited or rec.consecutive_failures >= self._failure_threshold:
-            rec.cooldown_until = time.time() + self._cooldown_seconds
+        rec.last_failure_reason = str(exc)
+        rec.last_failure_type = getattr(exc, "failure_type", "provider_error")
+        rec.last_cooldown_seconds = 0
+
+        should_cooldown = getattr(exc, "immediate_cooldown", False) or rec.consecutive_failures >= self._failure_threshold
+        if should_cooldown:
+            cooldown_seconds = self._cooldown_seconds_for(exc)
+            rec.cooldown_until = time.time() + cooldown_seconds
+            rec.last_cooldown_seconds = cooldown_seconds
+            return cooldown_seconds
+        return 0
 
     def _mark_empty_result(self, name: str) -> None:
         # Empty responses do not trigger cooldown on their own,
@@ -174,40 +191,27 @@ class ProviderRouter:
                     attempts,
                     latency_ms,
                 )
-            except RateLimitError as exc:
-                self._mark_failure(slot.provider.name, str(exc), rate_limited=True)
-                logger.warning(
-                    "event=provider_rate_limited request_id=%s provider=%s attempt=%s error=%s",
-                    request_id,
-                    slot.provider.name,
-                    attempts,
-                    exc,
-                )
-                provider_trace.append(
-                    {
-                        "provider": slot.provider.name,
-                        "status": "rate_limited",
-                        "attempt": attempts,
-                        "error": str(exc),
-                    }
-                )
             except ProviderError as exc:
-                self._mark_failure(slot.provider.name, str(exc), rate_limited=False)
+                cooldown_seconds = self._mark_failure(slot.provider.name, exc)
+                status = getattr(exc, "failure_type", "provider_error")
                 logger.warning(
-                    "event=provider_failed request_id=%s provider=%s attempt=%s error=%s",
+                    "event=provider_failed request_id=%s provider=%s attempt=%s status=%s error=%s cooldown_seconds=%s",
                     request_id,
                     slot.provider.name,
                     attempts,
+                    status,
                     exc,
+                    cooldown_seconds,
                 )
                 provider_trace.append(
                     {
                         "provider": slot.provider.name,
-                        "status": "failed",
+                        "status": status,
                         "attempt": attempts,
                         "error": str(exc),
+                        "cooldown_seconds": cooldown_seconds,
                     }
                 )
 
-            logger.info("event=provider_router_end request_id=%s query=%r attempts=%s", request_id, query, attempts)
+        logger.info("event=provider_router_end request_id=%s query=%r attempts=%s", request_id, query, attempts)
         return [], provider_trace
