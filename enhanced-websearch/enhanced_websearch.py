@@ -323,7 +323,12 @@ class Tools:
         __event_emitter__: Optional[Any] = None,
         __user__: Optional[dict] = None,
     ) -> dict:
-        """Long-form structured research via /research."""
+        """Long-form structured research via /research.
+
+        Public callers should prefer `balanced` for the normal research path and
+        `quality` for deliberate higher-latency work. `quick` remains accepted
+        by the backend for compatibility with older prompts and clients.
+        """
         user_valves = self._resolve_user_valves(__user__)
         effective_iterations = max_iterations or self._get_user_valve(user_valves, "max_iterations", 4)
         show_status = self._get_user_valve(user_valves, "show_status_updates", True)

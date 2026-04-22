@@ -59,6 +59,28 @@ class ProviderPreferencesConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unknown providers: exa, ghost"):
             load_config(path)
 
+    def test_litellm_provider_derives_path_and_default_api_key_env(self):
+        path = self._write_config(
+            """
+            modes:
+              fast:
+                max_provider_attempts: 1
+                max_queries: 1
+                max_pages_to_fetch: 1
+            providers:
+              - name: brave-search
+                kind: litellm-search
+                base_url: http://litellm.local
+                litellm_provider: brave-search
+            """
+        )
+
+        config = load_config(path)
+
+        self.assertEqual(len(config.providers), 1)
+        self.assertEqual(config.providers[0].path, "/search/brave-search")
+        self.assertEqual(config.providers[0].api_key_env, "LITELLM_API_KEY")
+
 
 if __name__ == "__main__":
     unittest.main()

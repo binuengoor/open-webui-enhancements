@@ -67,4 +67,6 @@ The wrapper returns backend JSON output directly, so the backend response contra
 
 The public POST /search endpoint is Perplexity-compatible and is used by `concise_search`.
 
+For `research_search`, the backend currently accepts `depth=quick|balanced|quality`, but `quick` is compatibility-only. Prefer `balanced` for the normal public research path and `quality` for deliberate higher-latency research.
+
 If `EWS_BEARER_TOKEN` is set, the wrapper forwards `Authorization: Bearer <token>` to the backend.

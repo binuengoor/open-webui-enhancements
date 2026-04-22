@@ -116,6 +116,12 @@ Request body:
   "user_context": {}
 }
 
+Compatibility note:
+
+- intended public depth vocabulary is `balanced|quality`
+- `depth=quick` is still accepted today for compatibility and transitional clients
+- internal execution still uses backend orchestration modes (`fast|research|deep`) behind the public endpoint
+
 Response returns the full structured research object (`SearchResponse`):
 
 - direct_answer, summary, findings
@@ -197,7 +203,7 @@ Available tools:
 Tool guidance:
 
 - `search` is the concise search path with only the few useful knobs kept (`max_results`, `display_server_time`, `search_mode`, `search_recency_filter`, `search_recency_amount`, `country`). `search_mode` accepts `auto`, `web`, `academic`, or `sec`; `search_recency_filter` accepts `none`, `hour`, `day`, `week`, `month`, or `year`; `search_recency_amount` (default `1`) lets you request multi-unit windows such as `3` + `month`.
-- `research` is the explicit long-form research path with only the needed research knobs (`source_mode`, `depth`, `max_iterations`, `include_legacy`, `strict_runtime`, `include_debug`). `source_mode` accepts `web`, `academia`, `social`, or `all`; `depth` accepts `quick`, `balanced`, or `quality`.
+- `research` is the explicit long-form research path with only the needed research knobs (`source_mode`, `depth`, `max_iterations`, `include_legacy`, `strict_runtime`, `include_debug`). `source_mode` accepts `web`, `academia`, `social`, or `all`; `depth` currently accepts `quick`, `balanced`, or `quality`, but `quick` should be treated as compatibility-only rather than the intended long-term public contract.
 - `fetch_page` and `extract_page_structure` are for page-level inspection and debugging.
 - `health_check` and `providers_health` are for operational checks.
 
@@ -396,13 +402,14 @@ Behavior:
 - Answer directly for simple, stable questions.
 - Use `concise_search` for quick factual lookups and lightweight comparisons.
 - Use `research_search` for broad, technical, evaluative, or source-sensitive questions.
+- Treat `balanced` as the normal public research depth; reserve `quality` for deliberate higher-latency work.
 - Use `fetch_page` / `extract_page_structure` only for targeted verification.
 - Stop when answer quality is sufficient.
 
 Escalation:
 - Start with the lightest useful path.
 - Escalate only when needed: `concise_search` -> `research_search`.
-- In `research_search`, escalate depth only as needed: `quick` -> `balanced` -> `quality`.
+- In `research_search`, escalate depth only as needed. Prefer `balanced` first; use `quick` only when maintaining compatibility with older clients/prompts; escalate to `quality` for clearly harder requests.
 
 `concise_search` knobs:
 - `search_mode`: `auto|web|academic|sec`
