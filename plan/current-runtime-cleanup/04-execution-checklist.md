@@ -16,7 +16,7 @@
 
 ## Phase 2: Trim orchestrator research synthesis cluster
 
-- [ ] Identify and remove Vane synthesis helpers (only used for old local research):
+- [x] Identify and remove Vane synthesis helpers (only used for old local research):
   - [ ] `_merge_vane_synthesis`
   - [ ] `_shape_vane_summaries`
   - [ ] `_normalize_vane_text`
@@ -25,7 +25,7 @@
   - [ ] `_is_truncation_like`
   - [ ] `_compress_summary_text`
   - [ ] `_condense_vane_text`
-- [ ] Identify and remove research vet/fallback helpers:
+- [x] Identify and remove research vet/fallback helpers:
   - [ ] `_maybe_vet_and_fallback_research`
   - [ ] `_run_research_vet`
   - [ ] `_looks_useful`
@@ -55,18 +55,18 @@
   - [ ] `_summarize_text`
   - [ ] `_common_terms`
   - [ ] `_confidence`
-- [ ] Audit: which evidence methods are still called by `/search` path vs only by old research path?
-- [ ] Remove Vane deep_search call from execute_search if research synthesis is removed
-- [ ] Remove VaneClient dependency from orchestrator if no longer needed
+- [x] Audit: which evidence methods are still called by `/search` path vs only by old research path?
+- [x] Remove Vane deep_search call from execute_search if research synthesis is removed
+- [x] Remove VaneClient dependency from orchestrator if no longer needed
 - [ ] Commit
 
 ## Phase 3: Consolidate Vane integration
 
-- [ ] Check if VaneClient is still used after Phase 2
+- [x] Check if VaneClient is still used after Phase 2
 - [ ] If VaneClient is only used by `/research` proxy, migrate to proxy
-- [ ] Remove VaneClient dependency from orchestrator
-- [ ] Remove VaneClient import from main.py
-- [ ] Update tests that stub VaneClient
+- [x] Remove VaneClient dependency from orchestrator
+- [x] Remove VaneClient import from main.py
+- [x] Update tests that stub VaneClient
 - [ ] Remove app/services/vane.py if no callers remain
 - [ ] Commit
 
@@ -82,7 +82,7 @@
 - [ ] Split `app/models/contracts.py` into:
   - [ ] public API contracts (PerplexitySearchRequest/Response, ResearchRequest, SearxngCompatRequest/Response, FetchRequest, ExtractRequest)
   - [ ] internal orchestration contracts (ProgressEvent, ProviderHealthRecord, ProviderResult, RoutingDecision, ResearchPlan)
-- [ ] Remove unused internal contracts if truly dead
+- [x] Remove unused internal contracts if truly dead
 - [ ] Update imports across codebase
 - [ ] Commit
 

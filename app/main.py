@@ -19,11 +19,9 @@ from app.providers.litellm_search import LiteLLMSearchProvider
 from app.providers.router import ProviderRouter, ProviderSlot
 from app.providers.searxng import SearxngProvider
 from app.services.fetcher import PageFetcher
-from app.services.compiler import ResultCompiler
 from app.services.orchestrator import ResearchOrchestrator
 from app.services.planner import QueryPlanner
 from app.services.ranking import Ranker
-from app.services.vane import VaneClient
 from app.services.run_history import RecentRunHistory
 from app.services.research_proxy import ResearchProxyService
 
@@ -76,24 +74,6 @@ def _build_orchestrator(config: AppConfig, router: ProviderRouter) -> ResearchOr
         user_agent=config.scraping.user_agent,
     )
 
-    vane = VaneClient(
-        enabled=config.vane.enabled,
-        url=config.vane.url,
-        timeout_s=config.vane.timeout_s,
-        default_optimization_mode="balanced",
-        chat_provider_id_env="VANE_CHAT_PROVIDER_ID",
-        chat_model_key=config.vane.chat_model_key,
-        embedding_provider_id_env="VANE_EMBED_PROVIDER_ID",
-        embedding_model_key=config.vane.embedding_model_key,
-    )
-
-    compiler = ResultCompiler(
-        enabled=config.compiler.enabled,
-        base_url=config.compiler.base_url,
-        timeout_s=config.compiler.timeout_s,
-        model_id=config.compiler.model_id,
-    )
-
     return ResearchOrchestrator(
         config=config,
         router=router,
@@ -102,8 +82,6 @@ def _build_orchestrator(config: AppConfig, router: ProviderRouter) -> ResearchOr
         fetcher=fetcher,
         planner=QueryPlanner(),
         ranker=Ranker(),
-        vane=vane,
-        compiler=compiler,
         run_history=RecentRunHistory(max_entries=100),
     )
 

@@ -241,16 +241,6 @@ class SearchResponse(BaseModel):
     legacy: Optional[Dict[str, Any]] = None
 
 
-class ResearchExportRequest(BaseModel):
-    response: SearchResponse
-
-
-class ResearchExportResponse(BaseModel):
-    id: str
-    directory: str
-    artifacts: Dict[str, str]
-
-
 class RunHistoryEntry(BaseModel):
     timestamp: str
     endpoint: Literal["/search", "/research"]

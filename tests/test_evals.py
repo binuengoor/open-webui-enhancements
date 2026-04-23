@@ -10,7 +10,6 @@ from app.cache.memory_cache import InMemoryCache
 from app.models.contracts import SearchRequest
 from app.providers.base import SearchProvider
 from app.providers.router import ProviderRouter, ProviderSlot
-from app.services.compiler import ResultCompiler
 from app.services.fetcher import PageFetcher
 from app.services.orchestrator import ResearchOrchestrator
 from app.services.planner import QueryPlanner
@@ -56,16 +55,6 @@ class FixtureFetcher(PageFetcher):
 
     async def extract(self, url: str) -> Dict[str, Any]:
         return {"url": url, "title": self._pages[url].get("title", ""), "headings": [], "links": [], "error": None}
-
-
-class FixtureVane:
-    async def deep_search(self, query: str, source_mode: str, depth: str) -> Dict[str, Any]:
-        return {"error": "disabled_for_eval_runner", "query": query, "source_mode": source_mode, "depth": depth}
-
-
-class DisabledCompiler(ResultCompiler):
-    def __init__(self):
-        super().__init__(enabled=False, base_url="", timeout_s=1, model_id="")
 
 
 def load_eval_fixtures() -> List[Dict[str, Any]]:
@@ -252,8 +241,6 @@ class EvalRunnerTests(unittest.IsolatedAsyncioTestCase):
             fetcher=self.fetcher,
             planner=QueryPlanner(),
             ranker=Ranker(),
-            vane=FixtureVane(),
-            compiler=DisabledCompiler(),
         )
 
     async def _run_fixture(self, fixture: Dict[str, Any]):

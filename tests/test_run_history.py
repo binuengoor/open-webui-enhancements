@@ -45,22 +45,6 @@ class StubFetcher:
         return {"url": url}
 
 
-class StubVane:
-    async def deep_search(self, query, source_mode, depth):
-        return {"error": "disabled"}
-
-
-class StubCompiler:
-    async def choose_search_profile(self, **kwargs):
-        return None
-
-    async def compile_perplexity_results(self, **kwargs):
-        return None
-
-    async def vet_research_response(self, **kwargs):
-        return None
-
-
 class RunHistoryTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         config = SimpleNamespace(
@@ -77,8 +61,6 @@ class RunHistoryTests(unittest.IsolatedAsyncioTestCase):
             fetcher=StubFetcher(),
             planner=QueryPlanner(),
             ranker=Ranker(),
-            vane=StubVane(),
-            compiler=StubCompiler(),
             run_history=self.history,
         )
 
