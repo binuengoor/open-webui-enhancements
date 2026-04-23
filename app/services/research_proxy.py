@@ -7,6 +7,8 @@ import uuid
 from dataclasses import dataclass
 from typing import AsyncIterator
 
+import anyio
+
 import httpx
 from fastapi import HTTPException
 from starlette.background import BackgroundTask
@@ -90,7 +92,8 @@ class ResearchProxyService:
             url,
         )
 
-        client = httpx.AsyncClient(timeout=self.config.vane.timeout_s)
+        timeout = httpx.Timeout(connect=self.config.vane.timeout_s, read=None, write=self.config.vane.timeout_s, pool=self.config.vane.timeout_s)
+        client = httpx.AsyncClient(timeout=timeout)
         try:
             response = await client.send(
                 client.build_request("POST", url, json=upstream_payload),
@@ -151,6 +154,15 @@ class ResearchProxyService:
                 async for chunk in response.aiter_raw():
                     if chunk:
                         yield chunk
+            except (httpx.ReadTimeout, httpx.RemoteProtocolError, httpx.ReadError, anyio.EndOfStream) as exc:
+                logger.warning(
+                    "event=research_proxy_stream_interrupted request_id=%s query=%r status=%s error=%s",
+                    request_id,
+                    payload.query,
+                    response.status_code,
+                    exc,
+                )
+                return
             finally:
                 latency_ms = int((time.perf_counter() - started) * 1000)
                 logger.info(
