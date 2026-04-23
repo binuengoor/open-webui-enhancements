@@ -162,7 +162,6 @@ class ResearchRouteProxyTests(unittest.TestCase):
         app.state.research_proxy = proxy
         app.state.config = SimpleNamespace()
         app.state.provider_router = SimpleNamespace()
-        app.state.report_exporter = SimpleNamespace()
 
         client = TestClient(app)
         response = client.post("/research", json={"query": "proxy me"})
@@ -182,7 +181,6 @@ class ResearchRouteProxyTests(unittest.TestCase):
         app.state.orchestrator = _Orch()
         app.state.config = SimpleNamespace()
         app.state.provider_router = SimpleNamespace()
-        app.state.report_exporter = SimpleNamespace()
         app.state.research_proxy = SimpleNamespace()
 
         client = TestClient(app)

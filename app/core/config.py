@@ -11,8 +11,6 @@ from pydantic import BaseModel, Field
 
 class ServiceConfig(BaseModel):
     request_timeout_s: int = 25
-    auto_export_research: bool = False
-    report_output_dir: str = "artifacts/reports"
 
 
 class SearchLimitsConfig(BaseModel):

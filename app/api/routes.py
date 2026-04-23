@@ -10,13 +10,11 @@ from app.models.contracts import (
     ExtractRequest,
     FetchRequest,
     PerplexitySearchRequest,
-    ResearchExportRequest,
     ResearchRequest,
     SearchRequest,
     SearxngCompatRequest,
 )
 from app.services.orchestrator import ResearchOrchestrator
-from app.services.report_exporter import ReportExporter
 from app.services.research_proxy import ResearchProxyService
 from app.services.searxng_compat import SearxngCompatService
 
@@ -35,10 +33,6 @@ def get_config(request: Request):
 
 def get_router_health(request: Request):
     return request.app.state.provider_router.health_snapshot
-
-
-def get_report_exporter(request: Request) -> ReportExporter:
-    return request.app.state.report_exporter
 
 
 def get_searxng_compat_service(request: Request) -> SearxngCompatService:
@@ -119,19 +113,6 @@ async def searxng_compat_search_vane(
     compat: SearxngCompatService = Depends(get_searxng_compat_service),
 ):
     return await _handle_searxng_compat_search(params, compat)
-
-
-@router.post("/research/export")
-async def export_research_report(
-    payload: ResearchExportRequest,
-    exporter: ReportExporter = Depends(get_report_exporter),
-):
-    try:
-        loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, exporter.export_research_report, payload.response)
-    except ValueError as exc:
-        logger.warning("research export failed: %s", exc)
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/fetch")

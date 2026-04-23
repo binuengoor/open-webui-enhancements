@@ -17,7 +17,6 @@ class ResearchRouteRequirementTests(unittest.TestCase):
         app.state.orchestrator = SimpleNamespace()
         app.state.config = SimpleNamespace()
         app.state.provider_router = SimpleNamespace()
-        app.state.report_exporter = SimpleNamespace()
 
         class _Proxy:
             async def streaming_response(self, payload):
@@ -46,7 +45,6 @@ class ResearchRouteRequirementTests(unittest.TestCase):
         app.state.orchestrator = SimpleNamespace()
         app.state.config = SimpleNamespace()
         app.state.provider_router = SimpleNamespace()
-        app.state.report_exporter = SimpleNamespace()
 
         class _Proxy:
             async def streaming_response(self, payload):

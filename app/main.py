@@ -22,7 +22,6 @@ from app.services.fetcher import PageFetcher
 from app.services.compiler import ResultCompiler
 from app.services.orchestrator import ResearchOrchestrator
 from app.services.planner import QueryPlanner
-from app.services.report_exporter import ReportExporter
 from app.services.ranking import Ranker
 from app.services.vane import VaneClient
 from app.services.run_history import RecentRunHistory
@@ -35,7 +34,6 @@ class Container:
     config: AppConfig
     orchestrator: ResearchOrchestrator
     provider_router: ProviderRouter
-    report_exporter: ReportExporter
     research_proxy: ResearchProxyService
 
 
@@ -96,10 +94,6 @@ def _build_orchestrator(config: AppConfig, router: ProviderRouter) -> ResearchOr
         model_id=config.compiler.model_id,
     )
 
-    report_dir = Path(config.service.report_output_dir)
-    if not report_dir.is_absolute():
-        report_dir = Path(__file__).resolve().parents[1] / report_dir
-
     return ResearchOrchestrator(
         config=config,
         router=router,
@@ -111,8 +105,6 @@ def _build_orchestrator(config: AppConfig, router: ProviderRouter) -> ResearchOr
         vane=vane,
         compiler=compiler,
         run_history=RecentRunHistory(max_entries=100),
-        report_exporter=ReportExporter(report_dir),
-        auto_export_research=config.service.auto_export_research,
     )
 
 
@@ -125,17 +117,14 @@ async def lifespan(app: FastAPI):
     orchestrator = _build_orchestrator(config, router)
 
     container.config = config
-    report_exporter = orchestrator.report_exporter
     research_proxy = ResearchProxyService(config=config)
 
     container.provider_router = router
     container.orchestrator = orchestrator
-    container.report_exporter = report_exporter
     container.research_proxy = research_proxy
     app.state.config = config
     app.state.provider_router = router
     app.state.orchestrator = orchestrator
-    app.state.report_exporter = report_exporter
     app.state.research_proxy = research_proxy
 
     enabled_providers = [provider.name for provider in config.providers if provider.enabled]
