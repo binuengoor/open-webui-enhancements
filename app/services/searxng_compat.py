@@ -10,7 +10,7 @@ from app.core.config import AppConfig
 from app.models.contracts import SearxngCompatRequest, SearxngCompatResponse, SearxngCompatResult
 from app.providers.base import SearchProvider
 from app.providers.router import ProviderRouter
-from app.services.orchestrator import ResearchOrchestrator
+from app.services.orchestrator import SearchService
 
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,7 @@ class CompatVerticalDecision:
 
 
 class SearxngCompatService:
-    def __init__(self, config: AppConfig, orchestrator: ResearchOrchestrator, router: ProviderRouter):
+    def __init__(self, config: AppConfig, orchestrator: SearchService, router: ProviderRouter):
         self.config = config
         self.orchestrator = orchestrator
         self.router = router

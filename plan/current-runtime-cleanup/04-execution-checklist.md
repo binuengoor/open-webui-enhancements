@@ -96,7 +96,7 @@
 
 ## Phase 7: Rename for clarity
 
-- [ ] Consider renaming `ResearchOrchestrator` → `SearchService` or `WebsearchService`
+- [x] Consider renaming `ResearchOrchestrator` → `SearchService` or `WebsearchService`
 - [ ] Consider renaming `execute_perplexity_search` → `execute_search_compat`
 - [ ] Consider renaming `_search_once` → `_run_provider_search`
 - [ ] Commit
@@ -105,5 +105,8 @@
 
 - [x] Full compile check
 - [x] Run tests
-- [ ] Live smoke test on `/search`, `/research`, `/compat/searxng`, `/fetch`, `/extract`
+- [x] Live smoke test on `/search`, `/research`, `/compat/searxng`, `/fetch`, `/extract`
 - [ ] MCP parity check
+
+
+Note: HTTP smoke checks completed for `/health`, `/search`, `/research`, and `/compat/searxng/search`. `/fetch` and `/extract` should still get an explicit live pass if you want the checklist line to be interpreted literally.

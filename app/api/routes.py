@@ -15,7 +15,7 @@ from app.models.contracts import (
     SearxngCompatRequest,
 )
 from app.models.internal import SearchResponse
-from app.services.orchestrator import ResearchOrchestrator
+from app.services.orchestrator import SearchService
 from app.services.research_proxy import ResearchProxyService
 from app.services.searxng_compat import SearxngCompatService
 
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def get_orchestrator(request: Request) -> ResearchOrchestrator:
+def get_orchestrator(request: Request) -> SearchService:
     return request.app.state.orchestrator
 
 
@@ -51,7 +51,7 @@ def get_research_proxy(request: Request) -> ResearchProxyService:
 @router.post("/")
 async def search_root(
     payload: PerplexitySearchRequest,
-    orch: ResearchOrchestrator = Depends(get_orchestrator),
+    orch: SearchService = Depends(get_orchestrator),
 ):
     """Root endpoint for Open WebUI Perplexity search integration"""
     try:
@@ -66,7 +66,7 @@ async def search_root(
 @router.post("/search")
 async def perplexity_search(
     payload: PerplexitySearchRequest,
-    orch: ResearchOrchestrator = Depends(get_orchestrator),
+    orch: SearchService = Depends(get_orchestrator),
 ):
     try:
         response = await orch.execute_perplexity_search(payload)
@@ -109,12 +109,12 @@ async def searxng_compat_search_vane(
 
 
 @router.post("/fetch")
-async def fetch(payload: FetchRequest, orch: ResearchOrchestrator = Depends(get_orchestrator)):
+async def fetch(payload: FetchRequest, orch: SearchService = Depends(get_orchestrator)):
     return await orch.fetch(payload.url)
 
 
 @router.post("/extract")
-async def extract(payload: ExtractRequest, orch: ResearchOrchestrator = Depends(get_orchestrator)):
+async def extract(payload: ExtractRequest, orch: SearchService = Depends(get_orchestrator)):
     return await orch.extract(payload.url)
 
 
@@ -134,10 +134,10 @@ async def effective_config(cfg=Depends(get_config)):
 
 
 @router.get("/metrics")
-async def metrics(orch: ResearchOrchestrator = Depends(get_orchestrator)):
+async def metrics(orch: SearchService = Depends(get_orchestrator)):
     return orch.metrics()
 
 
 @router.get("/runs/recent")
-async def recent_runs(limit: int = 20, orch: ResearchOrchestrator = Depends(get_orchestrator)):
+async def recent_runs(limit: int = 20, orch: SearchService = Depends(get_orchestrator)):
     return {"runs": orch.recent_runs(limit=limit)}

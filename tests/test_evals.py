@@ -11,7 +11,7 @@ from app.models.contracts import SearchRequest
 from app.providers.base import SearchProvider
 from app.providers.router import ProviderRouter, ProviderSlot
 from app.services.fetcher import PageFetcher
-from app.services.orchestrator import ResearchOrchestrator
+from app.services.orchestrator import SearchService
 from app.services.planner import QueryPlanner
 from app.services.ranking import Ranker
 from tests.eval_gates import score_response
@@ -233,7 +233,7 @@ class EvalRunnerTests(unittest.IsolatedAsyncioTestCase):
             cache=SimpleNamespace(ttl_general_s=300, ttl_recency_s=45, page_cache_ttl_s=120),
         )
         self.fetcher = FixtureFetcher(self.dataset)
-        self.orchestrator = ResearchOrchestrator(
+        self.orchestrator = SearchService(
             config=config,
             router=router,
             search_cache=InMemoryCache(max_entries=32),

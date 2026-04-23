@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 ProgressCallback = Callable[[ProgressEvent], Awaitable[None]]
 
 
-class ResearchOrchestrator:
+class SearchService:
     def __init__(
         self,
         config: AppConfig,

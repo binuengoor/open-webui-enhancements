@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 from app.cache.memory_cache import InMemoryCache
 from app.models.contracts import SearchRequest
-from app.services.orchestrator import ResearchOrchestrator
+from app.services.orchestrator import SearchService
 from app.services.planner import QueryPlanner
 from app.services.ranking import Ranker
 from app.services.run_history import RecentRunHistory
@@ -55,7 +55,7 @@ class RunHistoryTests(unittest.IsolatedAsyncioTestCase):
             research_llm_requirement_error="",
         )
         self.history = RecentRunHistory(max_entries=2)
-        self.orchestrator = ResearchOrchestrator(
+        self.orchestrator = SearchService(
             config=config,
             router=StubRouter(),
             search_cache=InMemoryCache(max_entries=8),

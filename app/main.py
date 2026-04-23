@@ -19,7 +19,7 @@ from app.providers.litellm_search import LiteLLMSearchProvider
 from app.providers.router import ProviderRouter, ProviderSlot
 from app.providers.searxng import SearxngProvider
 from app.services.fetcher import PageFetcher
-from app.services.orchestrator import ResearchOrchestrator
+from app.services.orchestrator import SearchService
 from app.services.planner import QueryPlanner
 from app.services.ranking import Ranker
 from app.services.run_history import RecentRunHistory
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 class Container:
     config: AppConfig
-    orchestrator: ResearchOrchestrator
+    orchestrator: SearchService
     provider_router: ProviderRouter
     research_proxy: ResearchProxyService
 
@@ -63,7 +63,7 @@ def _build_router(config: AppConfig) -> ProviderRouter:
     )
 
 
-def _build_orchestrator(config: AppConfig, router: ProviderRouter) -> ResearchOrchestrator:
+def _build_orchestrator(config: AppConfig, router: ProviderRouter) -> SearchService:
     search_cache = InMemoryCache(config.cache.max_entries)
     page_cache = InMemoryCache(config.cache.max_entries)
 
@@ -74,7 +74,7 @@ def _build_orchestrator(config: AppConfig, router: ProviderRouter) -> ResearchOr
         user_agent=config.scraping.user_agent,
     )
 
-    return ResearchOrchestrator(
+    return SearchService(
         config=config,
         router=router,
         search_cache=search_cache,
