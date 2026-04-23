@@ -1,138 +1,174 @@
 ---
-name: perplexica-research-workflow
-description: General-purpose Perplexity-style workflow for Open WebUI. Guides the model on when to answer directly, when to use concise_search vs research_search, how to verify sources, when to use sequential reasoning or subagents, and how to run a parallel search-plus-research pattern for stronger answers.
+name: perplexica-search-workflow
+description: Open WebUI skill for models that need guidance on using concise_search, fetch_page, extract_page_structure, and research_search sequentially and sparingly.
 ---
 
-# Perplexica Research Workflow
+# Perplexica Search Workflow
 
 Use this skill when the model has access to:
 
 - `concise_search`
-- `research_search`
 - `fetch_page`
 - `extract_page_structure`
-- `sequentialthinking`
-- subagents or parallel delegation tools
+- `research_search`
+- optionally `sequential-thinking`
 
-## Purpose
+This skill is designed for Open WebUI Native / Agentic Mode.
+It teaches the model how to use the search service well without overusing tools.
 
-Act like a strong general-purpose Perplexity replacement:
+## When To Use This Skill
 
-- answer simple questions directly
-- search efficiently when current information is needed
-- research more deeply when the question warrants it
-- verify specific sources when needed
-- synthesize instead of dumping tool output
-- stop when the answer is good enough
+Use this skill when:
+- the model does not already have a strong built-in system prompt for web research
+- the model needs explicit guidance on when to search vs when to answer directly
+- you want consistent behavior across different models using the same search tools
 
-## Tool roles
+Do not use this skill when:
+- the model already has a dedicated, well-tuned system prompt for this workflow
+- another attached skill already defines a conflicting research workflow
 
-- `concise_search` = quick, current, concise retrieval
-- `research_search` = slower, deeper synthesis-oriented research
-- `fetch_page` = targeted verification of a known URL
-- `extract_page_structure` = structured inspection of a known URL
-- `sequentialthinking` = deliberate multi-step reasoning
-- subagents = parallel or specialized work
+## Core Goal
 
-## Decision pattern
+Behave like a strong Perplexity-style assistant:
+- answer directly when no retrieval is needed
+- use search when current information matters
+- deepen only when snippets are insufficient
+- use slower research only when deeper synthesis is justified
+- stop when the answer is already good enough
+
+## Tool Roles
+
+- `concise_search` = default first tool for current information, quick grounding, and snippet-level evidence
+- `fetch_page` = read the full text of one or two promising URLs when snippets are not enough
+- `extract_page_structure` = inspect metadata or structure when structure itself matters
+- `research_search` = slower, deeper synthesis tool; use sparingly
+- `sequential-thinking` = optional planning tool for hard problems
+
+## Open WebUI Rule
+
+Open WebUI tool use is sequential.
+Do not plan concurrent tool work.
+Do not tell yourself to search while another tool is running.
+Decide what to do after each tool result arrives.
+
+## Decision Pattern
 
 Answer directly when:
-- the question is simple
-- it does not require current data
-- the answer can be given confidently from general knowledge or reasoning
+- the question is simple and stable
+- current information is not required
+- general knowledge or reasoning is enough
 
-Use `concise_search` when:
-- the task is current, factual, comparative, or verification-oriented
-- you want fast evidence before answering
+Use `concise_search` first when:
+- the question is current, factual, comparative, or verification-oriented
+- you need fast grounding before answering
+- you need current prices, releases, standings, dates, or recent events
 
-Use `research_search` when:
-- the task is broad, evaluative, technical, ambiguous, or source-sensitive
-- the user wants a report, breakdown, or deep dive
+Use `fetch_page` when:
+- search snippets are insufficient
+- one or two URLs look especially relevant or authoritative
+- exact details, wording, or page context matter
+
+Use `research_search` only when:
+- the question is broad, technical, evaluative, ambiguous, or source-sensitive
 - the answer needs synthesis across multiple sources
+- the user wants a deep dive, report, or careful recommendation
+- `concise_search` plus limited `fetch_page` is unlikely to be enough
 
-Use `fetch_page` or `extract_page_structure` only when you need to inspect a known source more carefully.
+Use `extract_page_structure` only when metadata or structure is the point.
 
-Use `sequentialthinking` when the logic itself is hard enough to benefit from explicit structure.
+Use `sequential-thinking` only when the reasoning itself is hard enough to benefit from explicit planning.
 
-Use subagents when there are multiple independent workstreams or a clean subtask that can be delegated.
+## Recommended Workflow
 
-## Escalation (Open WebUI — sequential)
+Default path:
+1. direct answer if retrieval is unnecessary
+2. `concise_search` for grounding
+3. assess whether the answer is already sufficient
+4. `fetch_page` for one or two key URLs if needed
+5. `research_search` only if deeper synthesis is still necessary
+6. answer
 
-Open WebUI tool calling is sequential. Do not plan parallel work.
-Start light and escalate only when needed:
+Stop early if the answer is already good enough.
 
-1. direct answer
-2. `concise_search`
-3. `research_search` (only if `concise_search` was not enough)
-4. targeted verification (`fetch_page` / `extract_page_structure`)
-5. answer
-
-Stop once the answer is already good enough.
-
-## Research loop
+## Research Loop
 
 For non-trivial questions:
 
-1. PLAN — identify the real question and a few concrete research angles
+1. PLAN — identify the real question and the few angles that matter most
 2. SEARCH — use `concise_search` for the current angle
 3. ASSESS — ask whether you have enough, and note contradictions or gaps
 4. DEEPEN — if snippets are insufficient, use `fetch_page`, `extract_page_structure`, or `research_search`
-5. RECENCY — for fast-moving topics, verify the dates of the strongest sources
+5. RECENCY — for fast-moving topics, check whether the strongest sources are current enough
 6. REPEAT or ANSWER — stop when more work would not materially improve the answer
 
-Do not run angles mechanically. Reassess after each pass.
+Do not execute every possible step mechanically.
+Reassess after each pass.
 
-## Sequential deep-dive workflow
+## How To Use Research_Search Well
 
-For high-value or complex questions, use a serial pass:
+Treat `research_search` as slower and more expensive than `concise_search`.
+Use it because it improves the answer, not because it exists.
 
-1. `concise_search` first for fast grounding and quick sources
-2. assess the result — is the answer already solid?
-3. if not, run `research_search` with `balanced` depth for deeper synthesis
-4. when research returns, compare both passes
-5. do at most one targeted `fetch_page` if a key claim still needs checking
-6. produce one consolidated answer with the strongest supported claims
-
-This is especially useful for:
-- product and market comparisons
+Prefer `research_search` for:
 - technical evaluations
-- current-events synthesis
-- sports, finance, or politics
-- any report or recommendation request where quality matters
+- product or market comparisons with tradeoffs
+- source-sensitive claims
+- broad explainers requiring synthesis
+- current-events questions where snippets alone are not enough
+- higher-stakes recommendation requests
 
-## Depth guidance
+Avoid `research_search` when:
+- a direct answer is enough
+- `concise_search` already answers the question
+- one `fetch_page` would settle the issue faster
+- the user wants a quick lookup, not a full report
 
-For `research_search`:
-- `speed` = quick pass
-- `balanced` = default
-- `quality` = slow, heavier pass for high-stakes questions
+## Search Behavior
 
-Prefer `balanced` unless the user clearly wants a deeper, slower answer.
+When using `concise_search`:
+- use targeted queries, not vague ones
+- prefer a small number of strong results over broad noisy searches
+- pay attention to dates for time-sensitive topics
+- if snippets already answer the question, do not escalate automatically
 
-## Output rules
+When using `fetch_page`:
+- fetch only the most relevant 1–2 URLs first
+- prefer authoritative, primary, or well-regarded sources when possible
+- use the page to verify claims, not to dump long excerpts into the final answer
+
+## Output Rules
 
 - Give the answer, not a tool transcript.
 - Use tool output to support reasoning, not replace it.
 - Surface uncertainty honestly.
 - Do not invent sources or overstate confidence.
 - Keep the response proportional to the question.
+- Do not dump raw JSON unless the user explicitly asks for raw output.
 
-## Suggested structure for research answers
+## Suggested Answer Structure
+
+For simple questions:
+- brief direct answer
+- sources only when helpful or when the claim is non-trivial/current
+
+For research or complex questions, use this structure when helpful:
 
 ## Direct Answer
-1–2 sentences that directly answer the user's question.
+1–2 sentences that directly answer the question.
 
 ## Key Findings
-Organized by theme or angle.
+Organize by theme or angle.
+Synthesize; do not just list search results.
 
 ## Confidence & Caveats
 - what is strongly supported
-- what is uncertain or disputed
+- what is uncertain, disputed, or based on limited evidence
 - what you could not verify
-- how recent the best sources are for fast-moving topics
+- for fast-moving topics, how recent the best sources are
 
 ## Sources
-Tie non-trivial claims to actual sources.
+List the key sources used.
+Tie non-trivial factual claims to real sources.
 
 (Optional) ## Worth Exploring Next
-Only when a follow-up would clearly help.
+Only if a follow-up direction would clearly help.
