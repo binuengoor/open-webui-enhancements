@@ -10,7 +10,7 @@ Mode = Literal["auto", "fast", "deep", "research", "fast_fallback"]
 ExecutionMode = Literal["fast", "deep", "research", "fast_fallback"]
 SourceMode = Literal["web", "academia", "social", "all"]
 DepthMode = Literal["quick", "balanced", "quality"]
-ResearchDepthMode = Literal["quick", "balanced", "quality"]
+ResearchDepthMode = Literal["quick", "speed", "balanced", "quality"]
 DecisionSource = Literal["heuristic", "llm", "override"]
 
 
@@ -42,7 +42,7 @@ class ResearchRequest(BaseModel):
 
     query: str = Field(min_length=1)
     source_mode: SourceMode = "web"
-    depth: ResearchDepthMode = "quality"
+    depth: ResearchDepthMode = "balanced"
     history: List[Dict[str, Any]] = Field(default_factory=list)
     system_instructions: str = ""
     user_context: Dict[str, Any] = Field(default_factory=dict)
@@ -66,7 +66,7 @@ class PerplexitySearchRequest(BaseModel):
     last_updated_before_filter: Optional[str] = None
     search_mode: Optional[Literal["auto", "web", "academic", "sec"]] = Field(
         default=None,
-        description="Search surface selector. `auto` is equivalent to omitting the field and uses the default web search behavior.",
+        description="Optional search surface selector. `auto` is accepted for backward compatibility and treated the same as omitting the field.",
     )
     mode: Optional[Mode] = Field(
         default=None,

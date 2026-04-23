@@ -14,7 +14,7 @@ from urllib.parse import urlparse
 
 from app.cache.memory_cache import InMemoryCache
 from app.core.config import AppConfig
-from app.models.contracts import PerplexitySearchRequest, PerplexitySearchResult, SearchRequest
+from app.models.contracts import PerplexitySearchRequest, PerplexitySearchResponse, PerplexitySearchResult, SearchRequest
 from app.providers.router import ProviderRouter
 from app.services.fetcher import PageFetcher
 from app.services.planner import QueryPlanner

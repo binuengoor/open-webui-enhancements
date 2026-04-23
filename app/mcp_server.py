@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
@@ -158,6 +159,35 @@ async def _backend_post(ctx: Context, path: str, payload: dict[str, Any]) -> dic
     try:
         response = await ctx.request_context.lifespan_context.client.post(path, json=payload)
         response.raise_for_status()
+        content_type = response.headers.get("content-type", "")
+        if "text/event-stream" in content_type:
+            text = (await response.aread()).decode("utf-8", errors="replace")
+            events: list[dict[str, Any]] = []
+            data_lines: list[str] = []
+            event_type = "message"
+            for line in text.splitlines():
+                if line.startswith("event:"):
+                    event_type = line.split(":", 1)[1].strip() or "message"
+                elif line.startswith("data:"):
+                    data_lines.append(line.split(":", 1)[1].lstrip())
+                elif not line.strip():
+                    if data_lines:
+                        data = "\n".join(data_lines)
+                        try:
+                            parsed = json.loads(data)
+                        except json.JSONDecodeError:
+                            parsed = data
+                        events.append({"event": event_type, "data": parsed})
+                    data_lines = []
+                    event_type = "message"
+            if data_lines:
+                data = "\n".join(data_lines)
+                try:
+                    parsed = json.loads(data)
+                except json.JSONDecodeError:
+                    parsed = data
+                events.append({"event": event_type, "data": parsed})
+            return {"events": events, "event_count": len(events)}
         return response.json()
     except httpx.TimeoutException as exc:
         timeout_s = ctx.request_context.lifespan_context.config.request_timeout_s
@@ -176,7 +206,7 @@ async def _backend_get(ctx: Context, path: str) -> dict[str, Any]:
 async def research(
     query: str,
     source_mode: Literal["web", "academia", "social", "all"] = "web",
-    depth: Literal["quick", "balanced", "quality"] = "quality",
+    depth: Literal["speed", "balanced", "quality"] = "balanced",
     history: Optional[list[dict[str, Any]]] = None,
     system_instructions: str = "",
     ctx: Context = None,
@@ -204,7 +234,7 @@ async def search(
     display_server_time: bool = False,
     search_recency_filter: Literal["none", "hour", "day", "week", "month", "year"] = "none",
     search_recency_amount: int = 1,
-    search_mode: Literal["auto", "web", "academic", "sec"] = "auto",
+    search_mode: Optional[Literal["web", "academic", "sec"]] = None,
     country: Optional[str] = None,
     ctx: Context = None,
 ) -> dict[str, Any]:
@@ -213,7 +243,7 @@ async def search(
         raise ValueError("search_recency_amount must be >= 1")
 
     normalized_recency_filter = None if search_recency_filter == "none" else search_recency_filter
-    normalized_search_mode = None if search_mode == "auto" else search_mode
+    normalized_search_mode = search_mode
 
     effective_recency_filter = normalized_recency_filter
     search_after_date_filter = None

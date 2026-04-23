@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 def _optimization_mode(depth: str) -> str:
-    if depth == "quick":
+    if depth in {"quick", "speed"}:
         return "speed"
     if depth == "quality":
         return "quality"
