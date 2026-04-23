@@ -4,7 +4,7 @@ import logging
 import time
 from dataclasses import dataclass
 from threading import Lock
-from typing import Any, Dict, List, Tuple
+from typing import Any, List, Tuple
 
 from app.models.contracts import ProviderHealthRecord
 from app.providers.base import ProviderError, SearchProvider
@@ -21,11 +21,10 @@ class ProviderSlot:
 
 
 class ProviderRouter:
-    def __init__(self, slots: List[ProviderSlot], cooldown_seconds: int, failure_threshold: int, provider_preferences: Dict[str, Dict[str, List[str]]] | None = None):
+    def __init__(self, slots: List[ProviderSlot], cooldown_seconds: int, failure_threshold: int):
         self._slots = slots
         self._cooldown_seconds = cooldown_seconds
         self._failure_threshold = max(1, failure_threshold)
-        self._provider_preferences = provider_preferences or {}
         self._cursor = 0
         self._lock = Lock()
         self._health: Dict[str, ProviderHealthRecord] = {
@@ -60,15 +59,7 @@ class ProviderRouter:
                 seen.add(name)
                 unique_order.append(slot)
 
-            if not mode:
-                return unique_order
-
-            preferred_names = set((self._provider_preferences.get(mode, {}) or {}).get("prefer", []))
-            avoided_names = set((self._provider_preferences.get(mode, {}) or {}).get("avoid", []))
-            preferred = [slot for slot in unique_order if slot.provider.name in preferred_names]
-            neutral = [slot for slot in unique_order if slot.provider.name not in preferred_names and slot.provider.name not in avoided_names]
-            avoided = [slot for slot in unique_order if slot.provider.name in avoided_names]
-            return preferred + neutral + avoided
+            return unique_order
 
     def _mark_success(self, name: str) -> None:
         rec = self._health[name]

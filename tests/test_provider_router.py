@@ -143,7 +143,7 @@ class ProviderRouterRoutedSearchTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(limited.calls), 0)
         self.assertEqual(len(healthy.calls), 1)
 
-    async def test_routed_search_falls_back_from_preferred_rate_limited_provider_to_next_preferred_provider(self):
+    async def test_routed_search_falls_back_from_rate_limited_provider_to_next_provider(self):
         searxng = DummyProvider("searxng", responses=[RateLimitError("limited", cooldown_seconds=23)])
         brave = DummyProvider("brave-search", responses=[[{"url": "https://example.com", "title": "fallback", "snippet": "ok", "provider": "brave-search"}]])
         exa = DummyProvider("exa", responses=[[{"url": "https://example.com/exa", "title": "later", "snippet": "ok", "provider": "exa"}]])
@@ -155,7 +155,6 @@ class ProviderRouterRoutedSearchTests(unittest.IsolatedAsyncioTestCase):
             ],
             cooldown_seconds=10,
             failure_threshold=2,
-            provider_preferences={"fast": {"prefer": ["searxng", "brave-search"], "avoid": ["exa"]}},
         )
 
         rows, trace = await router.routed_search("test query", {"request_id": "r4", "mode": "fast"}, max_attempts=2)
@@ -170,7 +169,7 @@ class ProviderRouterRoutedSearchTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(health["searxng"].last_cooldown_seconds, 23)
         self.assertEqual(len(exa.calls), 0)
 
-    async def test_routed_search_skips_auth_cooled_preferred_provider_and_keeps_mode_ordering(self):
+    async def test_routed_search_skips_auth_cooled_provider_and_keeps_rotation_order(self):
         exa = DummyProvider("exa")
         tavily = DummyProvider("tavily", responses=[[{"url": "https://example.com/tavily", "title": "fallback", "snippet": "ok", "provider": "tavily"}]])
         searxng = DummyProvider("searxng", responses=[[{"url": "https://example.com/searxng", "title": "later", "snippet": "ok", "provider": "searxng"}]])
@@ -182,7 +181,6 @@ class ProviderRouterRoutedSearchTests(unittest.IsolatedAsyncioTestCase):
             ],
             cooldown_seconds=10,
             failure_threshold=2,
-            provider_preferences={"deep": {"prefer": ["exa", "tavily", "searxng"], "avoid": []}},
         )
         router._mark_failure("exa", AuthProviderError("bad auth"))
 
@@ -196,7 +194,7 @@ class ProviderRouterRoutedSearchTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(tavily.calls), 1)
         self.assertEqual(len(searxng.calls), 0)
 
-    def test_pick_order_prioritizes_preferred_and_deprioritizes_avoided_for_mode(self):
+    def test_pick_order_preserves_weighted_rotation(self):
         alpha = DummyProvider("alpha")
         beta = DummyProvider("beta")
         gamma = DummyProvider("gamma")
@@ -208,32 +206,12 @@ class ProviderRouterRoutedSearchTests(unittest.IsolatedAsyncioTestCase):
             ],
             cooldown_seconds=10,
             failure_threshold=2,
-            provider_preferences={"research": {"prefer": ["gamma"], "avoid": ["alpha"]}},
-        )
-
-        ordered = router._pick_order(mode="research")
-
-        self.assertEqual([slot.provider.name for slot in ordered], ["gamma", "beta", "alpha"])
-
-    def test_pick_order_preserves_rotation_within_preferred_group(self):
-        alpha = DummyProvider("alpha")
-        beta = DummyProvider("beta")
-        gamma = DummyProvider("gamma")
-        router = ProviderRouter(
-            slots=[
-                ProviderSlot(provider=alpha, weight=1, enabled=True),
-                ProviderSlot(provider=beta, weight=1, enabled=True),
-                ProviderSlot(provider=gamma, weight=1, enabled=True),
-            ],
-            cooldown_seconds=10,
-            failure_threshold=2,
-            provider_preferences={"research": {"prefer": ["alpha", "beta"]}},
         )
         router._cursor = 1
 
         ordered = router._pick_order(mode="research")
 
-        self.assertEqual([slot.provider.name for slot in ordered], ["beta", "alpha", "gamma"])
+        self.assertEqual([slot.provider.name for slot in ordered], ["beta", "gamma", "alpha"])
 
 
 if __name__ == "__main__":

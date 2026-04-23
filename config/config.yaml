@@ -8,17 +8,6 @@ routing:
   cooldown_seconds: 90
   failure_threshold: 2
 
-provider_preferences:
-  fast:
-    prefer: [searxng, brave-search, serper]
-    avoid: [firecrawl, linkup]
-  research:
-    prefer: [searxng, exa, tavily, firecrawl, linkup]
-    avoid: []
-  deep:
-    prefer: [exa, tavily, firecrawl, linkup, searxng]
-    avoid: [brave-search]
-
 modes:
   fast:
     max_provider_attempts: 2
@@ -108,9 +97,9 @@ vane:
   url: ${VANE_URL}
   timeout_s: 25
   chat_provider_id: ${VANE_CHAT_PROVIDER_ID}
-  chat_model_key: auto-main
+  chat_model_key: ${VANE_CHAT_MODEL_KEY}
   embedding_provider_id: ${VANE_EMBED_PROVIDER_ID}
-  embedding_model_key: Xenova/nomic-embed-text-v1
+  embedding_model_key: ${VANE_EMBED_MODEL_KEY}
 
 logging:
   level: INFO

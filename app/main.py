@@ -64,9 +64,6 @@ def _build_router(config: AppConfig) -> ProviderRouter:
         slots=slots,
         cooldown_seconds=config.routing.cooldown_seconds,
         failure_threshold=config.routing.failure_threshold,
-        provider_preferences={
-            mode: prefs.model_dump() for mode, prefs in config.provider_preferences.items()
-        },
     )
 
 

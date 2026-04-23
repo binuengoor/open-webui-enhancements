@@ -29,11 +29,6 @@ class RoutingConfig(BaseModel):
     failure_threshold: int = 2
 
 
-class ProviderPreferenceConfig(BaseModel):
-    prefer: List[str] = Field(default_factory=list)
-    avoid: List[str] = Field(default_factory=list)
-
-
 class ProviderEntry(BaseModel):
     name: str
     kind: str
@@ -92,7 +87,6 @@ class LoggingConfig(BaseModel):
 class AppConfig(BaseModel):
     service: ServiceConfig = Field(default_factory=ServiceConfig)
     routing: RoutingConfig = Field(default_factory=RoutingConfig)
-    provider_preferences: Dict[str, ProviderPreferenceConfig] = Field(default_factory=dict)
     modes: Dict[str, ModeBudget]
     providers: List[ProviderEntry]
     cache: CacheConfig = Field(default_factory=CacheConfig)
@@ -119,18 +113,6 @@ class AppConfig(BaseModel):
             "research mode requires Vane proxy configuration "
             "(set `VANE_ENABLED=true` with `VANE_URL`, `VANE_CHAT_PROVIDER_ID`, and `VANE_EMBED_PROVIDER_ID`)"
         )
-
-    @model_validator(mode="after")
-    def validate_provider_preferences(self) -> "AppConfig":
-        known_provider_names = {provider.name for provider in self.providers}
-        for mode, prefs in self.provider_preferences.items():
-            unknown_names = sorted((set(prefs.prefer) | set(prefs.avoid)) - known_provider_names)
-            if unknown_names:
-                raise ValueError(
-                    f"provider_preferences[{mode}] references unknown providers: {', '.join(unknown_names)}"
-                )
-        return self
-
 
 _DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "config.yaml"
 
