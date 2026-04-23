@@ -137,9 +137,9 @@ class Tools:
         req = urllib.request.Request(url, data=data, headers=headers, method="POST")
 
         body_parts: list[str] = []
+        sources_payload: list[dict] = []
         event_type = "message"
         data_lines: list[str] = []
-        events: list[dict] = []
         error_info: Optional[dict] = None
 
         def _flush_sse_block() -> None:
@@ -152,7 +152,15 @@ class Tools:
                 parsed = json.loads(raw)
             except json.JSONDecodeError:
                 parsed = raw
-            events.append({"event": event_type, "data": parsed})
+            if isinstance(parsed, dict):
+                if parsed.get("type") == "response":
+                    d = parsed.get("data", "")
+                    if isinstance(d, str) and d:
+                        body_parts.append(d)
+                elif parsed.get("type") == "sources":
+                    data = parsed.get("data", [])
+                    if isinstance(data, list):
+                        sources_payload.extend(item for item in data if isinstance(item, dict))
             data_lines = []
             event_type = "message"
 
@@ -165,12 +173,14 @@ class Tools:
             if line.startswith("{"):
                 try:
                     obj = json.loads(line)
-                    events.append({"event": "message", "data": obj})
-                    # Extract body text from response events
                     if obj.get("type") == "response":
                         d = obj.get("data", "")
                         if isinstance(d, str) and d:
                             body_parts.append(d)
+                    elif obj.get("type") == "sources":
+                        data = obj.get("data", [])
+                        if isinstance(data, list):
+                            sources_payload.extend(item for item in data if isinstance(item, dict))
                     return
                 except json.JSONDecodeError:
                     pass
@@ -192,8 +202,8 @@ class Tools:
 
         return {
             "body": full_body,
-            "events": events,
-            "event_count": len(events),
+            "sources": sources_payload,
+            "source_count": len(sources_payload),
             "error": error_info,
         }
 
@@ -349,10 +359,24 @@ class Tools:
             stream=True,
         )
 
-        # If the backend returned a body, expose it as the primary content
+        # Expose the long-form body as primary content and keep sources concise.
         body = result.get("body")
         if body:
             result["content"] = body
+
+        sources = result.get("sources") or []
+        if sources:
+            cleaned_sources = []
+            for item in sources[:12]:
+                metadata = item.get("metadata", {}) if isinstance(item, dict) else {}
+                cleaned_sources.append(
+                    {
+                        "title": metadata.get("title"),
+                        "url": metadata.get("url"),
+                    }
+                )
+            result["sources"] = cleaned_sources
+            result["source_count"] = len(sources)
 
         return result
 
