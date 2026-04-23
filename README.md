@@ -122,10 +122,8 @@ Request body:
   "query": "string",
   "source_mode": "web|academia|social|all",
   "depth": "quick|balanced|quality",
-  "max_iterations": 4,
-  "include_debug": false,
-  "include_legacy": false,
-  "strict_runtime": false,
+  "history": [],
+  "system_instructions": "",
   "user_context": {}
 }
 
@@ -257,7 +255,7 @@ Available tools:
 Tool guidance:
 
 - `search` is the concise search path with only the few useful knobs kept (`max_results`, `display_server_time`, `search_mode`, `search_recency_filter`, `search_recency_amount`, `country`). `search_mode` accepts `auto`, `web`, `academic`, or `sec`; `auto` is normalized to the default behavior and sent to the backend the same as omitting the field; `search_recency_filter` accepts `none`, `hour`, `day`, `week`, `month`, or `year`; `search_recency_amount` (default `1`) lets you request multi-unit windows such as `3` + `month`.
-- `research` proxies the backend `/research` route, which in turn proxies Vane streaming research output. `source_mode` accepts `web`, `academia`, `social`, or `all`; `depth` accepts `quick`, `balanced`, or `quality`, with `quick` treated as compatibility-only.
+- `research` proxies the backend `/research` route, which in turn proxies Vane streaming research output. It accepts `query`, `source_mode`, `depth`, optional `history`, and optional `system_instructions`.
 - `fetch_page` and `extract_page_structure` are for page-level inspection and debugging.
 - `health_check`, `providers_health`, and `service_metrics` are for operational checks. Prefer `service_metrics` for the single aggregated view.
 

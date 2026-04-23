@@ -60,13 +60,13 @@ class SearchRequest(BaseModel):
 
 
 class ResearchRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     query: str = Field(min_length=1)
     source_mode: SourceMode = "web"
     depth: ResearchDepthMode = "quality"
-    max_iterations: int = Field(default=4, ge=1, le=8)
-    include_debug: bool = False
-    include_legacy: bool = False
-    strict_runtime: bool = False
+    history: List[Dict[str, Any]] = Field(default_factory=list)
+    system_instructions: str = ""
     user_context: Dict[str, Any] = Field(default_factory=dict)
 
 

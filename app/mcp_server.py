@@ -177,26 +177,21 @@ async def research(
     query: str,
     source_mode: Literal["web", "academia", "social", "all"] = "web",
     depth: Literal["quick", "balanced", "quality"] = "quality",
-    max_iterations: int = 4,
-    include_legacy: bool = False,
-    strict_runtime: bool = False,
-    include_debug: bool = False,
+    history: Optional[list[dict[str, Any]]] = None,
+    system_instructions: str = "",
     ctx: Context = None,
 ) -> dict[str, Any]:
     """Proxy Vane-backed research via /research.
 
-    This tool forwards the request to the backend research proxy. The backend always
-    uses upstream streaming mode; non-streaming callers receive the upstream response
-    body collected by the MCP backend client.
+    This mirrors the Vane relay surface: query, sources, optimization depth,
+    optional history, and optional system instructions.
     """
     payload = {
         "query": query,
         "source_mode": source_mode,
         "depth": depth,
-        "max_iterations": max_iterations,
-        "include_legacy": include_legacy,
-        "strict_runtime": strict_runtime,
-        "include_debug": include_debug,
+        "history": history or [],
+        "system_instructions": system_instructions,
         "user_context": {"client": "mcp", "tool": "research"},
     }
     return await _backend_post(ctx, "/research", payload)

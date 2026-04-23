@@ -68,8 +68,8 @@ class ResearchProxyService:
             "optimizationMode": _optimization_mode(payload.depth),
             "sources": _source_list(payload.source_mode),
             "query": payload.query,
-            "history": [],
-            "systemInstructions": "",
+            "history": payload.history,
+            "systemInstructions": payload.system_instructions,
             "stream": True,
         }
 
