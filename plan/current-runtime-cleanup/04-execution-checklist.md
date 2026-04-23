@@ -79,11 +79,11 @@
 
 ## Phase 5: Contracts cleanup
 
-- [ ] Split `app/models/contracts.py` into:
-  - [ ] public API contracts (PerplexitySearchRequest/Response, ResearchRequest, SearxngCompatRequest/Response, FetchRequest, ExtractRequest)
-  - [ ] internal orchestration contracts (ProgressEvent, ProviderHealthRecord, ProviderResult, RoutingDecision, ResearchPlan)
+- [x] Split `app/models/contracts.py` into:
+  - [x] public API contracts (PerplexitySearchRequest/Response, ResearchRequest, SearxngCompatRequest/Response, FetchRequest, ExtractRequest)
+  - [x] internal orchestration contracts (ProgressEvent, ProviderHealthRecord, ProviderResult, RoutingDecision, ResearchPlan)
 - [x] Remove unused internal contracts if truly dead
-- [ ] Update imports across codebase
+- [x] Update imports across codebase
 - [ ] Commit
 
 ## Phase 6: Stale config cleanup

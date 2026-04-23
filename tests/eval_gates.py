@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Iterable
 
-from app.models.contracts import SearchResponse
+from app.models.internal import SearchResponse
 
 
 GENERIC_PHRASES = {

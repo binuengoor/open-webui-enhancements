@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import unittest
 
-from app.models.contracts import Citation, Finding, SearchDiagnostics, SearchResponse, Source
+from app.models.contracts import Citation, Finding, Source
+from app.models.internal import SearchDiagnostics, SearchResponse
 from tests.eval_gates import score_response
 
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from app.models.contracts import SearchResponse
+from app.models.internal import SearchResponse
 
 
 _MIN_CITATIONS = 3

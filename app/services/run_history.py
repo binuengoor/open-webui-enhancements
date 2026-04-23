@@ -4,7 +4,7 @@ from collections import deque
 from threading import Lock
 from typing import Iterable, List
 
-from app.models.contracts import RunHistoryEntry
+from app.models.internal import RunHistoryEntry
 
 
 class RecentRunHistory:

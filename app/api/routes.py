@@ -14,6 +14,7 @@ from app.models.contracts import (
     SearchRequest,
     SearxngCompatRequest,
 )
+from app.models.internal import SearchResponse
 from app.services.orchestrator import ResearchOrchestrator
 from app.services.research_proxy import ResearchProxyService
 from app.services.searxng_compat import SearxngCompatService

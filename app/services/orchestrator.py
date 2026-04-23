@@ -9,13 +9,12 @@ from datetime import datetime, timedelta, timezone
 from collections import Counter
 from typing import Any, Awaitable, Callable, Dict, List, Tuple
 
-from app.models.contracts import RunHistoryEntry
+from app.models.internal import ProgressEvent, ResearchPlan, RoutingDecision, RunHistoryEntry, SearchDiagnostics, SearchResponse
 from urllib.parse import urlparse
 
 from app.cache.memory_cache import InMemoryCache
 from app.core.config import AppConfig
-from app.models.contracts import PerplexitySearchRequest, PerplexitySearchResult
-from app.models.contracts import ProgressEvent, ResearchPlan, RoutingDecision, SearchDiagnostics, SearchRequest, SearchResponse
+from app.models.contracts import PerplexitySearchRequest, PerplexitySearchResult, SearchRequest
 from app.providers.router import ProviderRouter
 from app.services.fetcher import PageFetcher
 from app.services.planner import QueryPlanner

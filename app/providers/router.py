@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from threading import Lock
 from typing import Any, List, Tuple
 
-from app.models.contracts import ProviderHealthRecord
+from app.models.internal import ProviderHealthRecord
 from app.providers.base import ProviderError, SearchProvider
 
 
