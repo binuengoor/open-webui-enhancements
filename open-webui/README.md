@@ -102,6 +102,18 @@ Recommended:
 - Enable the imported Enhanced Websearch tool
 - Attach the imported skill
 - Keep the prompt from `prompt.md`
+- Also allow supporting tools the model can call intelligently when useful
+
+Helpful supporting tools in your setup include:
+
+- `sequential-thinking` for explicit multi-step planning on hard questions
+- `time` for current date/time-sensitive answers
+- `fetch` or `playwright` when a page needs direct inspection outside the wrapper path
+- `Sub Agent` for parallel work on genuinely multi-track tasks
+- `Weather`, `News Reader`, `Youtube Tool`, or `Reddit Explorer` when the question is clearly domain-specific
+- `obsidian-mcp`, `vikunja`, `linkwarden`, or `sparkyfitness` only when the request is about the user's own systems/data and those tools are actually relevant
+
+Do not bloat the prompt by enumerating every possible tool behavior. The system prompt should establish the primary search/research workflow; the model can opportunistically use other tools when they clearly improve answer quality.
 
 If the model is weak at tool calling, this setup will be less reliable. It works best with stronger reasoning models.
 
