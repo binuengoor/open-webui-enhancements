@@ -67,9 +67,9 @@ class VaneConfig(BaseModel):
     url: str = ""
     timeout_s: int = 25
     default_optimization_mode: str = "balanced"
-    chat_provider_id_env: str = "VANE_CHAT_PROVIDER_ID"
+    chat_provider_id: str = ""
     chat_model_key: str = "auto-main"
-    embedding_provider_id_env: str = "VANE_EMBED_PROVIDER_ID"
+    embedding_provider_id: str = ""
     embedding_model_key: str = "Xenova/nomic-embed-text-v1"
 
 
@@ -104,16 +104,20 @@ class AppConfig(BaseModel):
 
     @property
     def research_llm_ready(self) -> bool:
-        compiler_ready = bool(self.compiler.enabled and self.compiler.base_url and self.compiler.model_id)
-        vane_ready = bool(self.vane.enabled and self.vane.url)
-        return compiler_ready or vane_ready
+        return bool(
+            self.vane.enabled
+            and self.vane.url
+            and self.vane.chat_provider_id
+            and self.vane.chat_model_key
+            and self.vane.embedding_provider_id
+            and self.vane.embedding_model_key
+        )
 
     @property
     def research_llm_requirement_error(self) -> str:
         return (
-            "research mode requires LLM support; enable Vane or configure the compiler "
-            "(set `VANE_ENABLED=true` with `VANE_URL`, or `EWS_COMPILER_ENABLED=true` with "
-            "`EWS_COMPILER_BASE_URL` and `EWS_COMPILER_MODEL_ID`)"
+            "research mode requires Vane proxy configuration "
+            "(set `VANE_ENABLED=true` with `VANE_URL`, `VANE_CHAT_PROVIDER_ID`, and `VANE_EMBED_PROVIDER_ID`)"
         )
 
     @model_validator(mode="after")
@@ -189,37 +193,22 @@ def _apply_env_overrides(payload: dict) -> dict:
         "VANE_DEFAULT_MODE",
         payload["vane"].get("default_optimization_mode", "balanced"),
     )
+    payload["vane"]["chat_provider_id"] = _env(
+        "VANE_CHAT_PROVIDER_ID",
+        payload["vane"].get("chat_provider_id", ""),
+    )
     payload["vane"]["chat_model_key"] = _env(
         "VANE_CHAT_MODEL_KEY",
         payload["vane"].get("chat_model_key", "auto-main"),
+    )
+    payload["vane"]["embedding_provider_id"] = _env(
+        "VANE_EMBED_PROVIDER_ID",
+        payload["vane"].get("embedding_provider_id", ""),
     )
     payload["vane"]["embedding_model_key"] = _env(
         "VANE_EMBED_MODEL_KEY",
         payload["vane"].get("embedding_model_key", "Xenova/nomic-embed-text-v1"),
     )
-
-    payload.setdefault("compiler", {})
-    payload["compiler"]["enabled"] = _env(
-        "EWS_COMPILER_ENABLED",
-        str(payload["compiler"].get("enabled", False)),
-    ).lower() in {"1", "true", "yes", "on"}
-    payload["compiler"]["base_url"] = _env(
-        "EWS_COMPILER_BASE_URL",
-        payload["compiler"].get("base_url", _env("LITELLM_SEARCH_BASE_URL", "")),
-    )
-    payload["compiler"]["timeout_s"] = int(
-        _env("EWS_COMPILER_TIMEOUT", str(payload["compiler"].get("timeout_s", 20)))
-    )
-    payload["compiler"]["model_id"] = _env(
-        "EWS_COMPILER_MODEL_ID",
-        payload["compiler"].get("model_id", ""),
-    )
-
-    payload.setdefault("planner", {})
-    payload["planner"]["llm_fallback_enabled"] = _env(
-        "EWS_PLANNER_LLM_FALLBACK_ENABLED",
-        str(payload["planner"].get("llm_fallback_enabled", False)),
-    ).lower() in {"1", "true", "yes", "on"}
 
     shared_litellm_key_env = "LITELLM_API_KEY"
     providers = payload.get("providers") or []
