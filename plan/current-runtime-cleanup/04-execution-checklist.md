@@ -103,7 +103,7 @@
 
 ## Phase 8: Validation
 
-- [ ] Full compile check
-- [ ] Run tests
+- [x] Full compile check
+- [x] Run tests
 - [ ] Live smoke test on `/search`, `/research`, `/compat/searxng`, `/fetch`, `/extract`
 - [ ] MCP parity check

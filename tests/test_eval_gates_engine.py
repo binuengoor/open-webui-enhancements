@@ -61,6 +61,7 @@ class EvalGateEngineTests(unittest.TestCase):
             mode="research",
             direct_answer=direct_answer,
             summary=summary,
+            body=direct_answer,
             findings=findings,
             citations=citations,
             sources=[

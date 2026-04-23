@@ -51,6 +51,8 @@ class RunHistoryTests(unittest.IsolatedAsyncioTestCase):
             search_limits=SimpleNamespace(max_provider_attempts=1, max_pages_to_fetch=4),
             vane=SimpleNamespace(enabled=False),
             cache=SimpleNamespace(ttl_general_s=300, ttl_recency_s=45, page_cache_ttl_s=120),
+            research_llm_ready=True,
+            research_llm_requirement_error="",
         )
         self.history = RecentRunHistory(max_entries=2)
         self.orchestrator = ResearchOrchestrator(

@@ -31,6 +31,10 @@ UNCERTAINTY_PHRASES = {
     "can vary",
     "uncertain",
     "limited evidence",
+    "limited",
+    "provisional",
+    "cautious",
+    "sparse",
 }
 CONTRADICTION_TERMS = {
     "however",

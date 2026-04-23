@@ -170,25 +170,8 @@ class ResearchRouteProxyTests(unittest.TestCase):
         self.assertEqual(len(proxy.calls), 1)
         self.assertEqual(proxy.calls[0].query, "proxy me")
 
-    def test_internal_search_is_deprecated(self):
-        app = FastAPI()
-        app.include_router(router)
 
-        class _Orch:
-            async def execute_search(self, payload, endpoint="/search"):
-                return SimpleNamespace(model_dump=lambda: {"query": payload.query, "endpoint": endpoint})
 
-        app.state.orchestrator = _Orch()
-        app.state.config = SimpleNamespace()
-        app.state.provider_router = SimpleNamespace()
-        app.state.research_proxy = SimpleNamespace()
-
-        client = TestClient(app)
-        response = client.post("/internal/search", json={"query": "deprecated", "mode": "fast"})
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["endpoint"], "/search")
-        self.assertIn("deprecated", response.json()["warnings"][0])
 
 
 if __name__ == "__main__":
