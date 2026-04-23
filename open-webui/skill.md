@@ -14,7 +14,7 @@ Use this skill when the model has access to:
 - optionally `sequential-thinking`
 
 This skill is designed for Open WebUI Native / Agentic Mode.
-It teaches the model how to use the search service well without overusing tools.
+It teaches the model how to use the search service well, with `research_search` as the preferred path for meaningful synthesis-heavy questions.
 
 ## When To Use This Skill
 
@@ -32,16 +32,16 @@ Do not use this skill when:
 Behave like a strong Perplexity-style assistant:
 - answer directly when no retrieval is needed
 - use search when current information matters
-- deepen only when snippets are insufficient
-- use slower research only when deeper synthesis is justified
+- prefer `research_search` for report-style, analytical, and synthesis-heavy questions
+- use `concise_search` for lighter grounding and routine checks
 - stop when the answer is already good enough
 
 ## Tool Roles
 
-- `concise_search` = default first tool for current information, quick grounding, and snippet-level evidence
+- `concise_search` = first tool for quick grounding, routine current questions, and snippet-level evidence
 - `fetch_page` = read the full text of one or two promising URLs when snippets are not enough
 - `extract_page_structure` = inspect metadata or structure when structure itself matters
-- `research_search` = slower, deeper synthesis tool; use sparingly
+- `research_search` = slower, deeper synthesis tool; preferred for report-style, analytical, and multi-angle questions
 - `sequential-thinking` = optional planning tool for hard problems
 
 ## Open WebUI Rule
@@ -68,11 +68,13 @@ Use `fetch_page` when:
 - one or two URLs look especially relevant or authoritative
 - exact details, wording, or page context matter
 
-Use `research_search` only when:
+Use `research_search` early when:
+- the user wants a report, research report, analysis, deep dive, overview, assessment, or careful recommendation
 - the question is broad, technical, evaluative, ambiguous, or source-sensitive
 - the answer needs synthesis across multiple sources
-- the user wants a deep dive, report, or careful recommendation
-- `concise_search` plus limited `fetch_page` is unlikely to be enough
+- the topic is current and multi-angle, such as how a team, company, market, or product is doing right now
+
+Do not wait until every search/fetch path is exhausted before using `research_search` for these cases.
 
 Use `extract_page_structure` only when metadata or structure is the point.
 
@@ -82,11 +84,12 @@ Use `sequential-thinking` only when the reasoning itself is hard enough to benef
 
 Default path:
 1. direct answer if retrieval is unnecessary
-2. `concise_search` for grounding
-3. assess whether the answer is already sufficient
-4. `fetch_page` for one or two key URLs if needed
-5. `research_search` only if deeper synthesis is still necessary
-6. answer
+2. if the user is asking for a report, analysis, season overview, status assessment, or synthesis-heavy answer, prefer `research_search` early
+3. otherwise use `concise_search` for grounding
+4. assess whether the answer is already sufficient
+5. `fetch_page` for one or two key URLs if needed
+6. use `research_search` whenever the answer still needs broader synthesis
+7. answer
 
 Stop early if the answer is already good enough.
 
@@ -95,7 +98,7 @@ Stop early if the answer is already good enough.
 For non-trivial questions:
 
 1. PLAN — identify the real question and the few angles that matter most
-2. SEARCH — use `concise_search` for the current angle
+2. SEARCH — use `concise_search` for the current angle, or `research_search` early if the task is report-style or synthesis-heavy
 3. ASSESS — ask whether you have enough, and note contradictions or gaps
 4. DEEPEN — if snippets are insufficient, use `fetch_page`, `extract_page_structure`, or `research_search`
 5. RECENCY — for fast-moving topics, check whether the strongest sources are current enough
@@ -106,22 +109,24 @@ Reassess after each pass.
 
 ## How To Use Research_Search Well
 
-Treat `research_search` as slower and more expensive than `concise_search`.
-Use it because it improves the answer, not because it exists.
+Treat `research_search` as slower and more expensive than `concise_search`, but still the preferred path for meaningful synthesis-heavy questions.
+Use it proactively for report-style work, not merely as a last resort.
 
 Prefer `research_search` for:
+- research reports, reports, analyses, deep dives, assessments, and overviews
 - technical evaluations
 - product or market comparisons with tradeoffs
 - source-sensitive claims
 - broad explainers requiring synthesis
 - current-events questions where snippets alone are not enough
+- questions like how something is doing right now, why it is performing that way, and what the important trends are
 - higher-stakes recommendation requests
 
 Avoid `research_search` when:
 - a direct answer is enough
-- `concise_search` already answers the question
+- `concise_search` clearly settles the question
 - one `fetch_page` would settle the issue faster
-- the user wants a quick lookup, not a full report
+- the user wants a brief lookup rather than a real report or analysis
 
 ## Search Behavior
 
