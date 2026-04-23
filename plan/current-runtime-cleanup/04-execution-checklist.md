@@ -106,7 +106,7 @@
 - [x] Full compile check
 - [x] Run tests
 - [x] Live smoke test on `/search`, `/research`, `/compat/searxng`, `/fetch`, `/extract`
-- [ ] MCP parity check
+- [x] MCP parity check
 
 
-Note: HTTP smoke checks completed for `/health`, `/search`, `/research`, and `/compat/searxng/search`. `/fetch` and `/extract` should still get an explicit live pass if you want the checklist line to be interpreted literally.
+Note: HTTP smoke checks completed for `/health`, `/search`, `/research`, `/compat/searxng/search`, `/fetch`, `/extract`, `/metrics`, and `/runs/recent`. MCP parity was verified at the backend adapter layer for `/search`, `/research`, `/fetch`, `/extract`, `/health`, and `/metrics`.
