@@ -239,13 +239,8 @@ class EvalRunnerTests(unittest.IsolatedAsyncioTestCase):
             failure_threshold=2,
         )
         config = SimpleNamespace(
-            modes={
-                "fast": SimpleNamespace(max_provider_attempts=1, max_queries=1, max_pages_to_fetch=4),
-                "deep": SimpleNamespace(max_provider_attempts=1, max_queries=2, max_pages_to_fetch=4),
-                "research": SimpleNamespace(max_provider_attempts=1, max_queries=2, max_pages_to_fetch=4),
-                "fast_fallback": SimpleNamespace(max_provider_attempts=1, max_queries=1, max_pages_to_fetch=3),
-            },
-            vane=SimpleNamespace(enabled=False, default_optimization_mode="balanced"),
+            search_limits=SimpleNamespace(max_provider_attempts=1, max_pages_to_fetch=4),
+            vane=SimpleNamespace(enabled=False),
             planner=SimpleNamespace(llm_fallback_enabled=False),
             cache=SimpleNamespace(ttl_general_s=300, ttl_recency_s=45, page_cache_ttl_s=120),
         )

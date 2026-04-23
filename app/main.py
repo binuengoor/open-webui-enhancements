@@ -82,7 +82,7 @@ def _build_orchestrator(config: AppConfig, router: ProviderRouter) -> ResearchOr
         enabled=config.vane.enabled,
         url=config.vane.url,
         timeout_s=config.vane.timeout_s,
-        default_optimization_mode=config.vane.default_optimization_mode,
+        default_optimization_mode="balanced",
         chat_provider_id_env="VANE_CHAT_PROVIDER_ID",
         chat_model_key=config.vane.chat_model_key,
         embedding_provider_id_env="VANE_EMBED_PROVIDER_ID",
@@ -141,9 +141,7 @@ async def lifespan(app: FastAPI):
     enabled_providers = [provider.name for provider in config.providers if provider.enabled]
     disabled_providers = [provider.name for provider in config.providers if not provider.enabled]
     logger.info(
-        "startup service=enhanced-websearch host=%s port=%s routing_policy=%s cooldown_seconds=%s failure_threshold=%s",
-        config.service.host,
-        config.service.port,
+        "startup service=enhanced-websearch routing_policy=%s cooldown_seconds=%s failure_threshold=%s",
         config.routing.policy,
         config.routing.cooldown_seconds,
         config.routing.failure_threshold,

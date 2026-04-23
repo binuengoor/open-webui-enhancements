@@ -48,7 +48,7 @@ class SearxngCompatServiceTests(unittest.IsolatedAsyncioTestCase):
             )
 
         orch = SimpleNamespace(_search_once=fake_search_once)
-        config = SimpleNamespace(modes={"fast": SimpleNamespace(max_provider_attempts=2)})
+        config = SimpleNamespace(search_limits=SimpleNamespace(max_provider_attempts=2))
         service = SearxngCompatService(config=config, orchestrator=orch, router=router)
 
         response = await service.execute(SearxngCompatRequest(q="example", format="json"))
@@ -71,7 +71,7 @@ class SearxngCompatServiceTests(unittest.IsolatedAsyncioTestCase):
             )
 
         orch = SimpleNamespace(_search_once=fake_search_once)
-        config = SimpleNamespace(modes={"fast": SimpleNamespace(max_provider_attempts=2)})
+        config = SimpleNamespace(search_limits=SimpleNamespace(max_provider_attempts=2))
         service = SearxngCompatService(config=config, orchestrator=orch, router=router)
 
         response = await service.execute(SearxngCompatRequest(q="example"))
@@ -83,7 +83,7 @@ class SearxngCompatServiceTests(unittest.IsolatedAsyncioTestCase):
     async def test_media_requests_passthrough_for_images_and_videos(self):
         router = ProviderRouter([ProviderSlot(provider=DummyProvider("searxng", base_url="https://searx.example"), weight=1, enabled=True)], 10, 1)
         orch = SimpleNamespace(_search_once=None)
-        config = SimpleNamespace(modes={"fast": SimpleNamespace(max_provider_attempts=2)})
+        config = SimpleNamespace(search_limits=SimpleNamespace(max_provider_attempts=2))
         service = SearxngCompatService(config=config, orchestrator=orch, router=router)
 
         class FakeResponse:
@@ -123,7 +123,7 @@ class SearxngCompatServiceTests(unittest.IsolatedAsyncioTestCase):
     async def test_media_detection_uses_category_or_engine_tokens(self):
         router = ProviderRouter([ProviderSlot(provider=DummyProvider("searxng"), weight=1, enabled=True)], 10, 1)
         orch = SimpleNamespace(_search_once=None)
-        config = SimpleNamespace(modes={"fast": SimpleNamespace(max_provider_attempts=2)})
+        config = SimpleNamespace(search_limits=SimpleNamespace(max_provider_attempts=2))
         service = SearxngCompatService(config=config, orchestrator=orch, router=router)
 
         self.assertEqual(service._detect_vertical(SearxngCompatRequest(q="q", categories="images")).vertical, "images")
@@ -159,7 +159,7 @@ class SearxngCompatRouteTests(unittest.TestCase):
             _search_once=search_once,
             record_failed_run=lambda **kwargs: None,
         )
-        app.state.config = SimpleNamespace(modes={"fast": SimpleNamespace(max_provider_attempts=2)})
+        app.state.config = SimpleNamespace(search_limits=SimpleNamespace(max_provider_attempts=2))
         app.state.provider_router = ProviderRouter([ProviderSlot(provider=DummyProvider("searxng"), weight=1, enabled=True)], 10, 1)
         return TestClient(app)
 

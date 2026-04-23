@@ -67,7 +67,7 @@ class SearxngCompatService:
             mode="fast",
             source_mode="web",
             depth="balanced",
-            max_attempts=self.config.modes["fast"].max_provider_attempts,
+            max_attempts=self.config.search_limits.max_provider_attempts,
             request_id=f"compat-{req.pageno}",
             limit_override=None,
             extra_options={

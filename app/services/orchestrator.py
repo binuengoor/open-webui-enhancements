@@ -78,7 +78,7 @@ class ResearchOrchestrator:
         started = time.perf_counter()
         routing_decision = RoutingDecision.model_validate(self.planner.build_route_decision(req.mode, req.query))
         selected_mode = routing_decision.selected_mode
-        mode_budget = self.config.modes[selected_mode]
+        search_limits = self.config.search_limits
 
         logger.info(
             "event=search_start request_id=%s mode=%s query=%r source_mode=%s depth=%s max_iterations=%s include_citations=%s include_legacy=%s",
@@ -105,7 +105,7 @@ class ResearchOrchestrator:
 
         iterations = 1
         if selected_mode == "research":
-            iterations = min(req.max_iterations, mode_budget.max_queries)
+            iterations = min(req.max_iterations, 4)
 
         seen_titles: List[str] = []
         for cycle in range(iterations):
@@ -139,7 +139,7 @@ class ResearchOrchestrator:
                 mode=selected_mode,
                 source_mode=req.source_mode,
                 depth=req.depth,
-                max_attempts=mode_budget.max_provider_attempts,
+                max_attempts=search_limits.max_provider_attempts,
                 request_id=request_id,
                 limit_override=req.user_context.get("limit_override"),
             )
@@ -157,7 +157,7 @@ class ResearchOrchestrator:
                 break
 
         fused = self.ranker.fuse(all_result_sets)
-        diverse = self.ranker.diversity_filter(fused, mode_budget.max_pages_to_fetch)
+        diverse = self.ranker.diversity_filter(fused, search_limits.max_pages_to_fetch)
 
         await self._emit_progress(
             progress_callback,
@@ -537,7 +537,7 @@ class ResearchOrchestrator:
         limit_override: Any = None,
         extra_options: Dict[str, Any] | None = None,
     ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], Dict[str, int]]:
-        limit = self.config.modes[mode].max_pages_to_fetch
+        limit = self.config.search_limits.max_pages_to_fetch
         if isinstance(limit_override, int) and limit_override > 0:
             limit = min(limit, limit_override)
 
@@ -639,7 +639,7 @@ class ResearchOrchestrator:
 
         fallback_request = PerplexitySearchRequest(
             query=fallback_query or req.query,
-            max_results=max(5, min(10, mode_budget.max_pages_to_fetch)),
+            max_results=max(5, min(10, search_limits.max_pages_to_fetch)),
             display_server_time=False,
             country=None,
             max_tokens=None,
@@ -1789,5 +1789,4 @@ class ResearchOrchestrator:
                 return "quality"
             return "balanced"
 
-        default_mode = self.config.vane.default_optimization_mode
-        return default_mode if default_mode in {"speed", "balanced", "quality"} else "balanced"
+        return "balanced"

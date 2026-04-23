@@ -1,26 +1,22 @@
 from __future__ import annotations
 
 import os
-import re
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 import yaml
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 
 
 class ServiceConfig(BaseModel):
-    host: str = "0.0.0.0"
-    port: int = 8091
     request_timeout_s: int = 25
     auto_export_research: bool = False
     report_output_dir: str = "artifacts/reports"
 
 
-class ModeBudget(BaseModel):
-    max_provider_attempts: int
-    max_queries: int
-    max_pages_to_fetch: int
+class SearchLimitsConfig(BaseModel):
+    max_provider_attempts: int = 2
+    max_pages_to_fetch: int = 5
 
 
 class RoutingConfig(BaseModel):
@@ -61,11 +57,10 @@ class VaneConfig(BaseModel):
     enabled: bool = False
     url: str = ""
     timeout_s: int = 25
-    default_optimization_mode: str = "balanced"
     chat_provider_id: str = ""
-    chat_model_key: str = "auto-main"
+    chat_model_key: str = ""
     embedding_provider_id: str = ""
-    embedding_model_key: str = "Xenova/nomic-embed-text-v1"
+    embedding_model_key: str = ""
 
 
 class CompilerConfig(BaseModel):
@@ -87,7 +82,7 @@ class LoggingConfig(BaseModel):
 class AppConfig(BaseModel):
     service: ServiceConfig = Field(default_factory=ServiceConfig)
     routing: RoutingConfig = Field(default_factory=RoutingConfig)
-    modes: Dict[str, ModeBudget]
+    search_limits: SearchLimitsConfig = Field(default_factory=SearchLimitsConfig)
     providers: List[ProviderEntry]
     cache: CacheConfig = Field(default_factory=CacheConfig)
     scraping: ScrapingConfig = Field(default_factory=ScrapingConfig)
@@ -122,23 +117,6 @@ def _env(name: str, default: str = "") -> str:
     return value if value is not None else default
 
 
-def _env_bool_optional(name: str) -> bool | None:
-    raw = os.getenv(name)
-    if raw is None:
-        return None
-    value = raw.strip().lower()
-    if value in {"1", "true", "yes", "on"}:
-        return True
-    if value in {"0", "false", "no", "off"}:
-        return False
-    return None
-
-
-def _provider_env_flag_name(provider_name: str) -> str:
-    token = re.sub(r"[^A-Za-z0-9]+", "_", provider_name.strip().upper()).strip("_")
-    return f"EWS_PROVIDER_{token}_ENABLED"
-
-
 def _expand_env_placeholders(value):
     if isinstance(value, dict):
         return {k: _expand_env_placeholders(v) for k, v in value.items()}
@@ -154,8 +132,6 @@ def _expand_env_placeholders(value):
 def _apply_env_overrides(payload: dict) -> dict:
     payload = _expand_env_placeholders(payload)
     payload.setdefault("service", {})
-    payload["service"]["host"] = _env("EWS_HOST", payload["service"].get("host", "0.0.0.0"))
-    payload["service"]["port"] = int(_env("EWS_PORT", str(payload["service"].get("port", 8091))))
 
     payload.setdefault("scraping", {})
     payload["scraping"]["flaresolverr_url"] = _env(
@@ -171,17 +147,13 @@ def _apply_env_overrides(payload: dict) -> dict:
         "on",
     }
     payload["vane"]["url"] = _env("VANE_URL", payload["vane"].get("url", ""))
-    payload["vane"]["default_optimization_mode"] = _env(
-        "VANE_DEFAULT_MODE",
-        payload["vane"].get("default_optimization_mode", "balanced"),
-    )
     payload["vane"]["chat_provider_id"] = _env(
         "VANE_CHAT_PROVIDER_ID",
         payload["vane"].get("chat_provider_id", ""),
     )
     payload["vane"]["chat_model_key"] = _env(
         "VANE_CHAT_MODEL_KEY",
-        payload["vane"].get("chat_model_key", "auto-main"),
+        payload["vane"].get("chat_model_key", ""),
     )
     payload["vane"]["embedding_provider_id"] = _env(
         "VANE_EMBED_PROVIDER_ID",
@@ -189,22 +161,16 @@ def _apply_env_overrides(payload: dict) -> dict:
     )
     payload["vane"]["embedding_model_key"] = _env(
         "VANE_EMBED_MODEL_KEY",
-        payload["vane"].get("embedding_model_key", "Xenova/nomic-embed-text-v1"),
+        payload["vane"].get("embedding_model_key", ""),
     )
 
     shared_litellm_key_env = "EWS_LITELLM_API_KEY"
     providers = payload.get("providers") or []
     for provider in providers:
-        name = provider.get("name", "").strip()
-        explicit_enabled = _env_bool_optional(_provider_env_flag_name(name))
-
         if provider.get("kind") == "litellm-search":
             provider["api_key_env"] = provider.get("api_key_env") or shared_litellm_key_env
             if not provider.get("path") and provider.get("litellm_provider"):
                 provider["path"] = f"/search/{provider['litellm_provider']}"
-
-        if explicit_enabled is not None:
-            provider["enabled"] = explicit_enabled
 
     return payload
 

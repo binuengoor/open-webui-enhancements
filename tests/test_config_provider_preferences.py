@@ -21,11 +21,9 @@ class ConfigLoadingTests(unittest.TestCase):
     def test_litellm_provider_derives_path_and_default_api_key_env(self):
         path = self._write_config(
             """
-            modes:
-              fast:
-                max_provider_attempts: 1
-                max_queries: 1
-                max_pages_to_fetch: 1
+            search_limits:
+              max_provider_attempts: 1
+              max_pages_to_fetch: 1
             providers:
               - name: brave-search
                 kind: litellm-search
@@ -43,11 +41,9 @@ class ConfigLoadingTests(unittest.TestCase):
     def test_research_llm_ready_when_vane_is_fully_configured(self):
         path = self._write_config(
             """
-            modes:
-              fast:
-                max_provider_attempts: 1
-                max_queries: 1
-                max_pages_to_fetch: 1
+            search_limits:
+              max_provider_attempts: 1
+              max_pages_to_fetch: 1
             providers:
               - name: searxng
                 kind: searxng
@@ -68,11 +64,9 @@ class ConfigLoadingTests(unittest.TestCase):
     def test_research_llm_not_ready_without_vane_config(self):
         path = self._write_config(
             """
-            modes:
-              fast:
-                max_provider_attempts: 1
-                max_queries: 1
-                max_pages_to_fetch: 1
+            search_limits:
+              max_provider_attempts: 1
+              max_pages_to_fetch: 1
             providers:
               - name: searxng
                 kind: searxng
@@ -87,11 +81,9 @@ class ConfigLoadingTests(unittest.TestCase):
     def test_research_llm_not_ready_without_vane_provider_ids(self):
         path = self._write_config(
             """
-            modes:
-              fast:
-                max_provider_attempts: 1
-                max_queries: 1
-                max_pages_to_fetch: 1
+            search_limits:
+              max_provider_attempts: 1
+              max_pages_to_fetch: 1
             providers:
               - name: searxng
                 kind: searxng
@@ -108,11 +100,9 @@ class ConfigLoadingTests(unittest.TestCase):
     def test_compiler_env_vars_do_not_override_config(self):
         path = self._write_config(
             """
-            modes:
-              fast:
-                max_provider_attempts: 1
-                max_queries: 1
-                max_pages_to_fetch: 1
+            search_limits:
+              max_provider_attempts: 1
+              max_pages_to_fetch: 1
             providers:
               - name: searxng
                 kind: searxng

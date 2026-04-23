@@ -1,6 +1,4 @@
 service:
-  host: 0.0.0.0
-  port: 8091
   request_timeout_s: 25
 
 routing:
@@ -8,19 +6,9 @@ routing:
   cooldown_seconds: 90
   failure_threshold: 2
 
-modes:
-  fast:
-    max_provider_attempts: 2
-    max_queries: 1
-    max_pages_to_fetch: 5
-  deep:
-    max_provider_attempts: 3
-    max_queries: 2
-    max_pages_to_fetch: 8
-  research:
-    max_provider_attempts: 3
-    max_queries: 4
-    max_pages_to_fetch: 10
+search_limits:
+  max_provider_attempts: 2
+  max_pages_to_fetch: 5
 
 providers:
   - name: searxng
