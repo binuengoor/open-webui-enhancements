@@ -161,11 +161,10 @@ async def _backend_post(ctx: Context, path: str, payload: dict[str, Any]) -> dic
         response.raise_for_status()
         content_type = response.headers.get("content-type", "")
         if "text/event-stream" in content_type:
-            text = (await response.aread()).decode("utf-8", errors="replace")
             events: list[dict[str, Any]] = []
             data_lines: list[str] = []
             event_type = "message"
-            for line in text.splitlines():
+            async for line in response.aiter_lines():
                 if line.startswith("event:"):
                     event_type = line.split(":", 1)[1].strip() or "message"
                 elif line.startswith("data:"):
