@@ -82,7 +82,8 @@ class Tools:
         if isinstance(user_valves, dict):
             value = user_valves.get(key)
             return default if value is None else value
-        return getattr(user_valves, key, None)
+        value = getattr(user_valves, key, None)
+        return default if value is None else value
 
     def _build_headers(self, extra_headers: Optional[dict[str, str]] = None) -> dict[str, str]:
         headers: dict[str, str] = {"Content-Type": "application/json"}
@@ -214,14 +215,23 @@ class Tools:
         if show_status:
             await self._emit_status(event_emitter, start_description)
 
-        if stream:
-            result = await asyncio.to_thread(self._post_research_stream, path, payload)
-        else:
-            result = await asyncio.to_thread(self._post_json, path, payload)
+        task = asyncio.create_task(
+            asyncio.to_thread(self._post_research_stream if stream else self._post_json, path, payload)
+        )
+
+        while not task.done():
+            await asyncio.sleep(8)
+            if task.done() or not show_status:
+                break
+            await self._emit_status(event_emitter, progress_description)
+
+        result = await task
 
         if show_status:
             if result.get("error"):
-                await self._emit_status(event_emitter, f"Error: {result['error']}", done=True)
+                error = result["error"]
+                message = error.get("error", "Request failed") if isinstance(error, dict) else str(error)
+                await self._emit_status(event_emitter, f"Error: {message}", done=True)
             else:
                 await self._emit_status(event_emitter, done_description, done=True)
 
@@ -353,11 +363,13 @@ class Tools:
         __user__: Optional[dict] = None,
     ) -> dict:
         """Fetch and extract text content from a single URL."""
+        user_valves = self._resolve_user_valves(__user__)
+        show_status = self._get_user_valve(user_valves, "show_status_updates", True)
         return await self._post_with_progress(
             "/fetch",
             {"url": url},
             __event_emitter__,
-            True,
+            show_status,
             f"Fetching: {url}",
             "Fetch still working...",
             "Fetch complete",
@@ -371,11 +383,13 @@ class Tools:
         __user__: Optional[dict] = None,
     ) -> dict:
         """Extract structured metadata and components from a single URL."""
+        user_valves = self._resolve_user_valves(__user__)
+        show_status = self._get_user_valve(user_valves, "show_status_updates", True)
         return await self._post_with_progress(
             "/extract",
             {"url": url, "components": components},
             __event_emitter__,
-            True,
+            show_status,
             f"Extracting: {url}",
             "Extraction still working...",
             "Extraction complete",
